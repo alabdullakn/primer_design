@@ -69,8 +69,10 @@ if run:
 
             st.success("Primers designed successfully.")
 
+            # Results table
             rows = [
                 {
+                    "Type": "FWD",
                     "Exon": "Exon 1",
                     "Primer (5'→3')": p1.seq_5to3,
                     "Length": p1.length,
@@ -79,6 +81,7 @@ if run:
                     "Score": round(p1.score, 2)
                 },
                 {
+                    "Type": "FWD",
                     "Exon": "Exon 2",
                     "Primer (5'→3')": p2.seq_5to3,
                     "Length": p2.length,
@@ -87,7 +90,8 @@ if run:
                     "Score": round(p2.score, 2)
                 },
                 {
-                    "Exon": "Exon 3 (Reverse)",
+                    "Type": "REV",
+                    "Exon": "Exon 3",
                     "Primer (5'→3')": p3.seq_5to3,
                     "Length": p3.length,
                     "Tm (°C)": round(p3.tm_c, 1),
@@ -99,21 +103,22 @@ if run:
             df = pd.DataFrame(rows)
             st.dataframe(df, use_container_width=True)
 
+            # Primer-BLAST links
             st.subheader("Primer-BLAST links (NCBI)")
 
             organism_name = "Homo sapiens"
+            url_exon1_pair = primer_blast_url_pair(p1.seq_5to3, p3.seq_5to3, organism_name)
+            url_exon2_pair = primer_blast_url_pair(p2.seq_5to3, p3.seq_5to3, organism_name)
 
-            url_exon1 = primer_blast_url_pair(p1.seq_5to3, p3.seq_5to3, organism_name)
-            url_exon2 = primer_blast_url_pair(p2.seq_5to3, p3.seq_5to3, organism_name)
-
-            st.markdown(f"**Exon 1 + Exon 3 (Reverse)**: [Open in Primer-BLAST]({url_exon1})")
-            st.markdown(f"**Exon 2 + Exon 3 (Reverse)**: [Open in Primer-BLAST]({url_exon2})")
+            st.markdown(f"**Exon 1 (FWD) + Exon 3 (REV)**: [Open in Primer-BLAST]({url_exon1_pair})")
+            st.markdown(f"**Exon 2 (FWD) + Exon 3 (REV)**: [Open in Primer-BLAST]({url_exon2_pair})")
 
             with st.expander("Single-primer Primer-BLAST links"):
-                st.markdown(f"**Exon 1**: [Primer-BLAST]({primer_blast_url_single(p1.seq_5to3)})")
-                st.markdown(f"**Exon 2**: [Primer-BLAST]({primer_blast_url_single(p2.seq_5to3)})")
-                st.markdown(f"**Exon 3 (Reverse)**: [Primer-BLAST]({primer_blast_url_single(p3.seq_5to3)})")
+                st.markdown(f"**Exon 1 (FWD)**: [Primer-BLAST]({primer_blast_url_single(p1.seq_5to3, organism_name)})")
+                st.markdown(f"**Exon 2 (FWD)**: [Primer-BLAST]({primer_blast_url_single(p2.seq_5to3, organism_name)})")
+                st.markdown(f"**Exon 3 (REV)**: [Primer-BLAST]({primer_blast_url_single(p3.seq_5to3, organism_name)})")
 
+            # Dimer report
             st.subheader("Dimer check (forward vs reverse)")
             print_dimer_report(p1, p2, p3)
 
