@@ -40,7 +40,8 @@ FOOTER_TEXT = (
 
 def add_footer():
     st.markdown("---")
-    st.caption(FOOTER_TEXT)
+    # st.caption does NOT reliably render markdown links, so use markdown
+    st.markdown(FOOTER_TEXT)
 
 # ---------------- Primer-BLAST URL helpers ----------------
 
@@ -364,9 +365,9 @@ with tabs[1]:
     needs_rev_a = any(p.endswith("REV A") for p in selected_pairs)
     needs_rev_b = any(p.endswith("REV B") for p in selected_pairs)
 
+    # IMPORTANT: do NOT st.stop() here, it kills the whole app (including qPCR tab)
     if len(selected_pairs) == 0:
         st.error("Please select at least one primer pair.")
-        st.stop()
 
     st.subheader("Paste exon sequences (A/C/G/T only)")
 
@@ -386,6 +387,8 @@ with tabs[1]:
 
     # Validate only what was selected
     missing = []
+    if len(selected_pairs) == 0:
+        missing.append("at least one primer pair selection")
     if needs_fwd_a and not exon1:
         missing.append("Forward A exon")
     if needs_fwd_b and not exon2:
@@ -397,19 +400,16 @@ with tabs[1]:
 
     if missing:
         st.error("Please paste: " + ", ".join(missing) + ".")
-        st.stop()
 
-    run = st.button("Design primers", key="as_run")
+    # Disable the button until inputs are valid (instead of st.stop())
+    run = st.button("Design primers", key="as_run", disabled=bool(missing))
 
-    if run:
+    if run and not missing:
         try:
             # We may need to run the primer engine once for REV A and once for REV B.
             res_A = None
             res_B = None
 
-            # If a forward exon is not needed (not selected), we still must provide something.
-            # To avoid confusing behavior, require the corresponding forward exon when any pair uses it (already enforced).
-            # If only FWD A pairs selected, exon2 can be empty; we pass exon2 as exon1 (dummy) but ignore p2 in output.
             exon2_safe = exon2 if exon2 else exon1
             exon1_safe = exon1 if exon1 else exon2_safe
 
@@ -438,10 +438,8 @@ with tabs[1]:
             st.success("Primers designed successfully.")
             st.caption(SCORE_EXPLANATION)
 
-            # Build output rows per selected pair
             out_rows = []
             blast_links = []
-
             org = "Homo sapiens"
 
             def add_pair_rows(pair_name: str, fwd_obj, rev_obj):
@@ -498,7 +496,6 @@ with tabs[1]:
                 st.markdown(f"**{name}**: [Open in Primer-BLAST]({url})")
             st.info(BLAST_INSTRUCTIONS)
 
-            # Dimer reports for each reverse set (only if generated)
             if res_A is not None:
                 st.subheader("Dimer check (Reverse A set)")
                 p1A, p2A, p3A = res_A
