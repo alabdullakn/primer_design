@@ -8,12 +8,12 @@ from primer_engine import (
 )
 
 # ===========================
-# Footer + Instructions text
+# Text blocks: instructions + score + footer
 # ===========================
 
 BLAST_INSTRUCTIONS = (
     "How to use Primer-BLAST:\n"
-    "1) Click the link below.\n"
+    "1) Click the **Open in Primer-BLAST** link.\n"
     "2) On the NCBI page, do NOT change any settings.\n"
     "3) Just click **Get Primers**.\n"
     "4) Check the top hit matches your intended gene/transcript.\n"
@@ -30,8 +30,10 @@ SCORE_EXPLANATION = (
 )
 
 FOOTER_TEXT = (
-    "This website is free and was built by Khalid Alabdulla. "
-    "If it helped you, please share it."
+    "This tool is free and open to everyone. "
+    "It was designed and built by Khalid Alabdulla. "
+    "If you find it useful, please consider sharing it."
+    "If you have feedback or find a bug, email alabdulla8932@gmail.com"
 )
 
 def add_footer():
@@ -114,15 +116,17 @@ def primer_score(seq: str, tm_target: float) -> float:
 
 # ---------------- qPCR junction design ----------------
 
-def design_qpcr_junction_primers(full_with_bar: str,
-                                min_len: int,
-                                max_len: int,
-                                tm_target: float,
-                                tm_tol: float,
-                                min_junction_overlap: int,
-                                amplicon_min: int,
-                                amplicon_max: int,
-                                downstream_window: int):
+def design_qpcr_junction_primers(
+    full_with_bar: str,
+    min_len: int,
+    max_len: int,
+    tm_target: float,
+    tm_tol: float,
+    min_junction_overlap: int,
+    amplicon_min: int,
+    amplicon_max: int,
+    downstream_window: int
+):
     s = clean_dna(full_with_bar)
     if s.count("|") != 1:
         raise ValueError("Paste ONE sequence and mark the junction with exactly one '|' like EXON1|EXON2.")
@@ -179,15 +183,17 @@ def design_qpcr_junction_primers(full_with_bar: str,
 
 # ---------------- Basic PCR design (one sequence -> FWD + REV) ----------------
 
-def design_basic_pcr_primers(template: str,
-                            min_len: int,
-                            max_len: int,
-                            tm_target: float,
-                            tm_tol: float,
-                            start_window: int,
-                            end_window: int,
-                            amplicon_min: int,
-                            amplicon_max: int):
+def design_basic_pcr_primers(
+    template: str,
+    min_len: int,
+    max_len: int,
+    tm_target: float,
+    tm_tol: float,
+    start_window: int,
+    end_window: int,
+    amplicon_min: int,
+    amplicon_max: int
+):
     s = clean_dna(template).replace("|", "")
     if len(s) < max(amplicon_min, 80):
         raise ValueError("Sequence is too short. Paste a longer template sequence.")
@@ -305,7 +311,6 @@ with tabs[0]:
 
                 st.success("Basic PCR primers designed successfully.")
                 st.caption(SCORE_EXPLANATION)
-                st.info(BLAST_INSTRUCTIONS)
 
                 rows = [
                     {"Type": "FWD", "Primer (5'→3')": fwd, "Length": len(fwd), "Tm (°C)": round(tm_wallace(fwd), 1), "GC (%)": round(gc_pct(fwd), 1), "Score": round(primer_score(fwd, tm_target), 2)},
@@ -318,6 +323,7 @@ with tabs[0]:
                 st.subheader("Primer-BLAST link (pair)")
                 org = "Homo sapiens"
                 st.markdown(f"[Open in Primer-BLAST]({primer_blast_url_pair(fwd, rev, org)})")
+                st.info(BLAST_INSTRUCTIONS)
 
             except Exception as e:
                 st.error(str(e))
@@ -363,7 +369,6 @@ with tabs[1]:
 
                 st.success("Primers designed successfully.")
                 st.caption(SCORE_EXPLANATION)
-                st.info(BLAST_INSTRUCTIONS)
 
                 rows = [
                     {"Type": "FWD", "Exon": "Exon 1", "Primer (5'→3')": p1.seq_5to3, "Length": p1.length, "Tm (°C)": round(p1.tm_c, 1), "GC (%)": round(p1.gc_pct, 1), "Score": round(p1.score, 2)},
@@ -376,6 +381,7 @@ with tabs[1]:
                 org = "Homo sapiens"
                 st.markdown(f"**Exon 1 (FWD) + Exon 3 (REV)**: [Open in Primer-BLAST]({primer_blast_url_pair(p1.seq_5to3, p3.seq_5to3, org)})")
                 st.markdown(f"**Exon 2 (FWD) + Exon 3 (REV)**: [Open in Primer-BLAST]({primer_blast_url_pair(p2.seq_5to3, p3.seq_5to3, org)})")
+                st.info(BLAST_INSTRUCTIONS)
 
                 with st.expander("Single-primer Primer-BLAST links"):
                     st.markdown(f"**Exon 1 (FWD)**: [Primer-BLAST]({primer_blast_url_single(p1.seq_5to3, org)})")
@@ -459,7 +465,6 @@ with tabs[2]:
 
                 st.success("qPCR primers designed successfully.")
                 st.caption(SCORE_EXPLANATION)
-                st.info(BLAST_INSTRUCTIONS)
 
                 rows = [
                     {"Type": "FWD (junction)", "Primer (5'→3')": fwd, "Length": len(fwd), "Tm (°C)": round(tm_wallace(fwd), 1), "GC (%)": round(gc_pct(fwd), 1), "Score": round(primer_score(fwd, tm_target), 2)},
@@ -472,6 +477,7 @@ with tabs[2]:
                 st.subheader("Primer-BLAST link (pair)")
                 org = "Homo sapiens"
                 st.markdown(f"[Open in Primer-BLAST]({primer_blast_url_pair(fwd, rev, org)})")
+                st.info(BLAST_INSTRUCTIONS)
 
             except Exception as e:
                 st.error(str(e))
