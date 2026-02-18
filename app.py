@@ -112,7 +112,6 @@ def design_qpcr_junction_primers(full_with_bar: str,
     fwd_best = min(fwd_candidates, key=lambda q: primer_score(q, tm_target))
 
     # Reverse primer: choose in right side downstream, then reverse-complement it
-    # We pick a binding site on the PLUS strand downstream and output the primer 5'->3' (revcomp of site)
     search_start = junction_pos + max(amplicon_min - len(fwd_best), 10)
     search_end = min(len(full), junction_pos + downstream_window)
 
@@ -126,7 +125,6 @@ def design_qpcr_junction_primers(full_with_bar: str,
             primer = revcomp(site)
             tm = tm_wallace(primer)
             if abs(tm - tm_target) <= tm_tol:
-                # approximate amplicon length: from fwd start (near junction) to rev site end
                 amplicon_len = (start + L) - (junction_pos - (len(fwd_best) // 2))
                 if amplicon_min <= amplicon_len <= amplicon_max:
                     rev_candidates.append((primer, amplicon_len))
@@ -211,7 +209,33 @@ with tabs[0]:
 
 with tabs[1]:
     st.title("qPCR Junction Primer Tool")
-    st.write("Paste one full sequence and mark the exon junction with a single '|' character like EXON1|EXON2.")
+    st.write("Design qPCR primers where the forward primer spans an exon–exon junction.")
+
+    st.markdown(
+        """
+**How to get a transcript sequence with exon boundaries**
+- Use AceView (NCBI): https://www.ncbi.nlm.nih.gov/IEB/Research/Acembly/index.html?human  
+- Search your gene and open a transcript to view the spliced mRNA/cDNA sequence.
+- Copy the sequence and identify the exon boundary you want to target.
+
+**How to use this tab**
+1) Paste the full spliced sequence (cDNA) into the box below.  
+2) Mark the exon junction with a single `|` character (exactly one).  
+3) Example junction formatting:
+- `...AAGGACCTGATGCTGAC|GTTCCAGGAGTCTGACT...`
+- Left of `|` = upstream exon end
+- Right of `|` = downstream exon start
+
+**What the tool does**
+- Designs a junction-spanning **forward** primer (must include bases from both sides of `|`).  
+- Designs a **reverse** primer downstream to hit your amplicon size range.  
+- Provides a paired Primer-BLAST link (FWD + REV) so you can check specificity.
+        """
+    )
+
+    st.info(
+        "Tip: If no primer is found, try increasing Tm tolerance, widening length range, or increasing the downstream window."
+    )
 
     with st.sidebar:
         st.subheader("qPCR options")
@@ -220,7 +244,12 @@ with tabs[1]:
         amp_max = st.number_input("Amplicon max (bp)", 80, 600, 200)
         down_win = st.number_input("Downstream search window (bp)", 150, 2000, 600)
 
-    seq_full = st.text_area("Full sequence with junction marker |", height=220, key="qpcr_full")
+    seq_full = st.text_area(
+        "Full sequence with junction marker |",
+        height=220,
+        key="qpcr_full",
+        placeholder="Paste here, e.g.\n...AAGGACCTGATGCTGAC|GTTCCAGGAGTCTGACT..."
+    )
 
     run_q = st.button("Design junction primers", key="qpcr_run")
 
