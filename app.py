@@ -7,6 +7,37 @@ from primer_engine import (
     print_dimer_report
 )
 
+# ===========================
+# Footer + Instructions text
+# ===========================
+
+BLAST_INSTRUCTIONS = (
+    "How to use Primer-BLAST:\n"
+    "1) Click the link below.\n"
+    "2) On the NCBI page, do NOT change any settings.\n"
+    "3) Just click **Get Primers**.\n"
+    "4) Check the top hit matches your intended gene/transcript.\n"
+    "This is a quick specificity check."
+)
+
+SCORE_EXPLANATION = (
+    "Score (lower is better): internal ranking only.\n"
+    "It is based on:\n"
+    "• |Tm − target Tm|\n"
+    "• +5 penalty for long homopolymer runs (e.g. AAAAA)\n"
+    "• +3 penalty for extreme GC% (<35% or >65%)\n"
+    "This is not a BLAST score and not experimental validation."
+)
+
+FOOTER_TEXT = (
+    "This website is free and was built by Khalid Alabdulla. "
+    "If it helped you, please share it."
+)
+
+def add_footer():
+    st.markdown("---")
+    st.caption(FOOTER_TEXT)
+
 # ---------------- Primer-BLAST URL helpers ----------------
 
 def primer_blast_url_pair(fwd_seq: str, rev_seq: str, organism: str = "Homo sapiens") -> str:
@@ -273,6 +304,8 @@ with tabs[0]:
                 )
 
                 st.success("Basic PCR primers designed successfully.")
+                st.caption(SCORE_EXPLANATION)
+                st.info(BLAST_INSTRUCTIONS)
 
                 rows = [
                     {"Type": "FWD", "Primer (5'→3')": fwd, "Length": len(fwd), "Tm (°C)": round(tm_wallace(fwd), 1), "GC (%)": round(gc_pct(fwd), 1), "Score": round(primer_score(fwd, tm_target), 2)},
@@ -288,6 +321,8 @@ with tabs[0]:
 
             except Exception as e:
                 st.error(str(e))
+
+    add_footer()
 
 # -------- Tab 2: Alternative splicing --------
 
@@ -327,6 +362,8 @@ with tabs[1]:
                 )
 
                 st.success("Primers designed successfully.")
+                st.caption(SCORE_EXPLANATION)
+                st.info(BLAST_INSTRUCTIONS)
 
                 rows = [
                     {"Type": "FWD", "Exon": "Exon 1", "Primer (5'→3')": p1.seq_5to3, "Length": p1.length, "Tm (°C)": round(p1.tm_c, 1), "GC (%)": round(p1.gc_pct, 1), "Score": round(p1.score, 2)},
@@ -350,6 +387,8 @@ with tabs[1]:
 
             except Exception as e:
                 st.error(str(e))
+
+    add_footer()
 
 # -------- Tab 3: qPCR junction primers --------
 
@@ -419,6 +458,8 @@ with tabs[2]:
                 )
 
                 st.success("qPCR primers designed successfully.")
+                st.caption(SCORE_EXPLANATION)
+                st.info(BLAST_INSTRUCTIONS)
 
                 rows = [
                     {"Type": "FWD (junction)", "Primer (5'→3')": fwd, "Length": len(fwd), "Tm (°C)": round(tm_wallace(fwd), 1), "GC (%)": round(gc_pct(fwd), 1), "Score": round(primer_score(fwd, tm_target), 2)},
@@ -434,3 +475,5 @@ with tabs[2]:
 
             except Exception as e:
                 st.error(str(e))
+
+    add_footer()
