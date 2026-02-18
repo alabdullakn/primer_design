@@ -24,11 +24,12 @@ def primer_blast_url_single(primer_seq: str, organism: str = "Homo sapiens") -> 
     }
     return "https://www.ncbi.nlm.nih.gov/tools/primer-blast/index.cgi?" + urllib.parse.urlencode(params)
 
-# ---------------- Simple qPCR junction design helpers ----------------
+# ---------------- Simple primer helpers ----------------
 
 DNA = set("ACGT")
 
 def clean_dna(s: str) -> str:
+    # keep A/C/G/T and also allow '|' for junction tab
     return "".join([c for c in s.upper() if c in DNA or c == "|"])
 
 def gc_pct(seq: str) -> float:
@@ -63,14 +64,24 @@ def has_bad_runs(seq: str, max_run: int = 4) -> bool:
     return False
 
 def primer_score(seq: str, tm_target: float) -> float:
+    """
+    Lower is better.
+    This is a simple heuristic: closeness to target Tm,
+    penalties for long homopolymers and extreme GC%.
+    """
     tm = tm_wallace(seq)
     score = abs(tm - tm_target)
+
     if has_bad_runs(seq, max_run=4):
         score += 5.0
+
     gcp = gc_pct(seq)
     if gcp < 35 or gcp > 65:
         score += 3.0
+
     return score
+
+# ---------------- qPCR junction design ----------------
 
 def design_qpcr_junction_primers(full_with_bar: str,
                                 min_len: int,
@@ -83,7 +94,7 @@ def design_qpcr_junction_primers(full_with_bar: str,
                                 downstream_window: int):
     s = clean_dna(full_with_bar)
     if s.count("|") != 1:
-        raise ValueError("For qPCR: paste ONE full sequence and mark the junction with exactly one '|' like EXON1|EXON2.")
+        raise ValueError("Paste ONE sequence and mark the junction with exactly one '|' like EXON1|EXON2.")
 
     j = s.index("|")
     left = s[:j]
@@ -94,7 +105,7 @@ def design_qpcr_junction_primers(full_with_bar: str,
     full = left + right
     junction_pos = len(left)
 
-    # Forward primer must span junction: take x bases from left tail + y bases from right head
+    # Forward primer spans junction
     fwd_candidates = []
     for L in range(min_len, max_len + 1):
         for x in range(min_junction_overlap, min(L - min_junction_overlap, len(left)) + 1):
@@ -111,17 +122,17 @@ def design_qpcr_junction_primers(full_with_bar: str,
 
     fwd_best = min(fwd_candidates, key=lambda q: primer_score(q, tm_target))
 
-    # Reverse primer: choose in right side downstream, then reverse-complement it
+    # Reverse primer downstream
     search_start = junction_pos + max(amplicon_min - len(fwd_best), 10)
     search_end = min(len(full), junction_pos + downstream_window)
 
     if search_start >= search_end - min_len:
-        raise ValueError("Downstream search window is too small for a reverse primer.")
+        raise ValueError("Downstream window too small for a reverse primer. Increase downstream window.")
 
     rev_candidates = []
     for L in range(min_len, max_len + 1):
         for start in range(search_start, search_end - L + 1):
-            site = full[start:start + L]  # plus strand site
+            site = full[start:start + L]
             primer = revcomp(site)
             tm = tm_wallace(primer)
             if abs(tm - tm_target) <= tm_tol:
@@ -130,17 +141,83 @@ def design_qpcr_junction_primers(full_with_bar: str,
                     rev_candidates.append((primer, amplicon_len))
 
     if not rev_candidates:
-        raise ValueError("No reverse primer found that matches amplicon constraints. Try wider amplicon range or downstream window.")
+        raise ValueError("No reverse primer found. Try wider amplicon range or downstream window.")
 
     rev_best, best_amp = min(rev_candidates, key=lambda x: primer_score(x[0], tm_target))
-
     return fwd_best, rev_best, best_amp
+
+# ---------------- Basic PCR design (one sequence -> FWD + REV) ----------------
+
+def design_basic_pcr_primers(template: str,
+                            min_len: int,
+                            max_len: int,
+                            tm_target: float,
+                            tm_tol: float,
+                            start_window: int,
+                            end_window: int,
+                            amplicon_min: int,
+                            amplicon_max: int):
+    s = clean_dna(template).replace("|", "")
+    if len(s) < max(amplicon_min, 80):
+        raise ValueError("Sequence is too short. Paste a longer template sequence.")
+
+    # forward candidates in first start_window bases
+    start_window = min(start_window, len(s))
+    fwd_candidates = []
+    for L in range(min_len, max_len + 1):
+        for i in range(0, max(0, start_window - L + 1)):
+            seq = s[i:i + L]
+            tm = tm_wallace(seq)
+            if abs(tm - tm_target) <= tm_tol:
+                fwd_candidates.append((seq, i))
+
+    if not fwd_candidates:
+        raise ValueError("No forward primer found. Increase Tm tolerance or start window or length range.")
+
+    # reverse candidates in last end_window bases
+    end_window = min(end_window, len(s))
+    rev_candidates = []
+    end_start = max(0, len(s) - end_window)
+    for L in range(min_len, max_len + 1):
+        for i in range(end_start, len(s) - L + 1):
+            site = s[i:i + L]
+            primer = revcomp(site)
+            tm = tm_wallace(primer)
+            if abs(tm - tm_target) <= tm_tol:
+                rev_candidates.append((primer, i, L))
+
+    if not rev_candidates:
+        raise ValueError("No reverse primer found. Increase Tm tolerance or end window or length range.")
+
+    # choose best pair by score + amplicon constraint
+    best = None
+    best_key = None
+    for fwd, f_i in fwd_candidates:
+        for rev, r_i, r_L in rev_candidates:
+            amp_len = (r_i + r_L) - f_i
+            if amplicon_min <= amp_len <= amplicon_max:
+                key = (
+                    primer_score(fwd, tm_target) + primer_score(rev, tm_target),
+                    abs(amp_len - ((amplicon_min + amplicon_max) / 2))
+                )
+                if best is None or key < best_key:
+                    best = (fwd, rev, amp_len, f_i, r_i)
+                    best_key = key
+
+    if best is None:
+        raise ValueError("Could not find a primer pair that matches your amplicon size. Widen amplicon range or windows.")
+
+    return best  # fwd, rev, amp_len, fwd_start, rev_site_start
 
 # ---------------- Streamlit UI ----------------
 
 st.set_page_config(page_title="Primer Designer", layout="wide")
 
-tabs = st.tabs(["Alternative splicing (Exon primers)", "qPCR (junction primers)"])
+tabs = st.tabs([
+    "Basic PCR (two primers from one sequence)",
+    "Alternative splicing (Exon primers)",
+    "qPCR (junction primers)"
+])
 
 with st.sidebar:
     st.header("Primer settings")
@@ -149,9 +226,78 @@ with st.sidebar:
     tm_target = st.number_input("Target Tm (°C)", 50.0, 70.0, 60.0)
     tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 15.0, 5.0)
 
-# -------- Tab 1: Alternative splicing (your current exon tool) --------
+# -------- Tab 1: Basic PCR --------
 
 with tabs[0]:
+    st.title("Basic PCR Primer Tool")
+    st.write("Paste one DNA sequence and get a forward and reverse primer (no junction required).")
+
+    st.markdown(
+        """
+**How to use**
+1) Paste your template sequence (A/C/G/T only).  
+2) The tool searches for:
+- a forward primer near the beginning
+- a reverse primer near the end  
+3) You control the amplicon size range.
+
+If you want to check specificity, use the Primer-BLAST link at the bottom.
+        """
+    )
+
+    with st.sidebar:
+        st.subheader("Basic PCR options")
+        basic_start_win = st.number_input("Forward search window (bp from start)", 50, 3000, 300)
+        basic_end_win = st.number_input("Reverse search window (bp from end)", 50, 3000, 300)
+        basic_amp_min = st.number_input("Amplicon min (bp)", 50, 5000, 100)
+        basic_amp_max = st.number_input("Amplicon max (bp)", 80, 8000, 400)
+
+    template = st.text_area(
+        "Template sequence (A/C/G/T only)",
+        height=240,
+        key="basic_template",
+        placeholder="Paste a gene region, plasmid region, or any DNA template here..."
+    )
+
+    run_b = st.button("Design basic PCR primers", key="basic_run")
+
+    if run_b:
+        if not template:
+            st.error("Please paste a template sequence.")
+        else:
+            try:
+                fwd, rev, amp_len, f_i, r_i = design_basic_pcr_primers(
+                    template,
+                    min_len=min_len,
+                    max_len=max_len,
+                    tm_target=tm_target,
+                    tm_tol=tm_tol,
+                    start_window=int(basic_start_win),
+                    end_window=int(basic_end_win),
+                    amplicon_min=int(basic_amp_min),
+                    amplicon_max=int(basic_amp_max),
+                )
+
+                st.success("Basic PCR primers designed successfully.")
+
+                rows = [
+                    {"Type": "FWD", "Primer (5'→3')": fwd, "Length": len(fwd), "Tm (°C)": round(tm_wallace(fwd), 1), "GC (%)": round(gc_pct(fwd), 1), "Score": round(primer_score(fwd, tm_target), 2)},
+                    {"Type": "REV", "Primer (5'→3')": rev, "Length": len(rev), "Tm (°C)": round(tm_wallace(rev), 1), "GC (%)": round(gc_pct(rev), 1), "Score": round(primer_score(rev, tm_target), 2)},
+                ]
+                st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+                st.write(f"Estimated amplicon length (approx): **{amp_len} bp**")
+
+                st.subheader("Primer-BLAST link (pair)")
+                org = "Homo sapiens"
+                st.markdown(f"[Open in Primer-BLAST]({primer_blast_url_pair(fwd, rev, org)})")
+
+            except Exception as e:
+                st.error(str(e))
+
+# -------- Tab 2: Alternative splicing --------
+
+with tabs[1]:
     st.title("Exon Primer Design Tool")
     st.write("Design exon-specific primers with Tm optimization, dimer checks, and direct Primer-BLAST links.")
 
@@ -205,36 +351,30 @@ with tabs[0]:
             except Exception as e:
                 st.error(str(e))
 
-# -------- Tab 2: qPCR junction primers --------
+# -------- Tab 3: qPCR junction primers --------
 
-with tabs[1]:
+with tabs[2]:
     st.title("qPCR Junction Primer Tool")
     st.write("Design qPCR primers where the forward primer spans an exon–exon junction.")
 
     st.markdown(
         """
 **How to get a transcript sequence with exon boundaries**
-- Use AceView (NCBI): https://www.ncbi.nlm.nih.gov/IEB/Research/Acembly/index.html?human  
-- Search your gene and open a transcript to view the spliced mRNA/cDNA sequence.
-- Copy the sequence and identify the exon boundary you want to target.
+- Use AceView (NCBI): https://www.ncbi.nlm.nih.gov/IEB/Research/Acembly/index.html?human
+- Search your gene and open a transcript to view the spliced sequence.
+- Copy the spliced cDNA sequence and choose the junction you want.
 
 **How to use this tab**
-1) Paste the full spliced sequence (cDNA) into the box below.  
-2) Mark the exon junction with a single `|` character (exactly one).  
-3) Example junction formatting:
+1) Paste the full spliced sequence (cDNA) below  
+2) Mark the exon junction with exactly one `|`  
+3) Example:
 - `...AAGGACCTGATGCTGAC|GTTCCAGGAGTCTGACT...`
-- Left of `|` = upstream exon end
-- Right of `|` = downstream exon start
 
-**What the tool does**
-- Designs a junction-spanning **forward** primer (must include bases from both sides of `|`).  
-- Designs a **reverse** primer downstream to hit your amplicon size range.  
-- Provides a paired Primer-BLAST link (FWD + REV) so you can check specificity.
+**What you get**
+- Junction-spanning forward primer
+- Reverse primer downstream (amplicon size controlled)
+- Paired Primer-BLAST link
         """
-    )
-
-    st.info(
-        "Tip: If no primer is found, try increasing Tm tolerance, widening length range, or increasing the downstream window."
     )
 
     with st.sidebar:
