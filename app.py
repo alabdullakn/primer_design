@@ -29,11 +29,13 @@ SCORE_EXPLANATION = (
     "This is not a BLAST score and not experimental validation."
 )
 
+# Option 1 (copy-paste style)
 FOOTER_TEXT = (
     "This tool is free and open to everyone. "
-    "Designed and built by Khalid Alabdulla. "
+    "It was designed and built by Khalid Alabdulla. "
     "If you find it useful, please consider sharing it. "
-    "For feedback or bug reports, email alabdulla8932@gmail.com."
+    "For feedback or bug reports, contact "
+    "[alabdulla8932@gmail.com](mailto:alabdulla8932@gmail.com)."
 )
 
 def add_footer():
@@ -62,7 +64,6 @@ def primer_blast_url_single(primer_seq: str, organism: str = "Homo sapiens") -> 
 DNA = set("ACGT")
 
 def clean_dna(s: str) -> str:
-    # keep A/C/G/T and also allow '|' for junction tab
     return "".join([c for c in s.upper() if c in DNA or c == "|"])
 
 def gc_pct(seq: str) -> float:
@@ -97,11 +98,6 @@ def has_bad_runs(seq: str, max_run: int = 4) -> bool:
     return False
 
 def primer_score(seq: str, tm_target: float) -> float:
-    """
-    Lower is better.
-    This is a simple heuristic: closeness to target Tm,
-    penalties for long homopolymers and extreme GC%.
-    """
     tm = tm_wallace(seq)
     score = abs(tm - tm_target)
 
@@ -140,7 +136,6 @@ def design_qpcr_junction_primers(
     full = left + right
     junction_pos = len(left)
 
-    # Forward primer spans junction
     fwd_candidates = []
     for L in range(min_len, max_len + 1):
         for x in range(min_junction_overlap, min(L - min_junction_overlap, len(left)) + 1):
@@ -157,7 +152,6 @@ def design_qpcr_junction_primers(
 
     fwd_best = min(fwd_candidates, key=lambda q: primer_score(q, tm_target))
 
-    # Reverse primer downstream
     search_start = junction_pos + max(amplicon_min - len(fwd_best), 10)
     search_end = min(len(full), junction_pos + downstream_window)
 
@@ -243,7 +237,9 @@ def design_basic_pcr_primers(
 
     return best  # fwd, rev, amp_len, fwd_start, rev_site_start
 
-# ---------------- Streamlit UI ----------------
+# ===========================
+# Streamlit UI
+# ===========================
 
 st.set_page_config(page_title="Primer Designer", layout="wide")
 
@@ -330,11 +326,27 @@ with tabs[0]:
 
     add_footer()
 
-# -------- Tab 2: Alternative splicing (now supports 2 reverse options + checklist) --------
+# -------- Tab 2: Alternative splicing --------
 
 with tabs[1]:
     st.title("Exon Primer Design Tool")
     st.write("Design exon-specific primers with Tm optimization, dimer checks, and direct Primer-BLAST links.")
+
+    # Pair selection ABOVE sequences, max 3
+    st.subheader("Choose which primer pairs to generate (max 3)")
+    pair_options = [
+        "FWD A + REV A",
+        "FWD A + REV B",
+        "FWD B + REV A",
+        "FWD B + REV B",
+    ]
+    selected_pairs = st.multiselect(
+        "Select up to 3 primer pairs",
+        options=pair_options,
+        default=["FWD A + REV A"],
+        max_selections=3,
+        key="as_pair_select"
+    )
 
     with st.expander("Edit primer conditions", expanded=False):
         c1, c2 = st.columns(2)
@@ -346,112 +358,169 @@ with tabs[1]:
             max_len = st.number_input("Max primer length", 16, 40, 25, key="as_max_len")
             tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 15.0, 5.0, key="as_tm_tol")
 
+    # Decide which sequences are needed based on selected pairs
+    needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
+    needs_fwd_b = any(p.startswith("FWD B") for p in selected_pairs)
+    needs_rev_a = any(p.endswith("REV A") for p in selected_pairs)
+    needs_rev_b = any(p.endswith("REV B") for p in selected_pairs)
+
+    if len(selected_pairs) == 0:
+        st.error("Please select at least one primer pair.")
+        st.stop()
+
     st.subheader("Paste exon sequences (A/C/G/T only)")
 
-    fwd_a_seq = st.text_area("Forward A sequence", height=150, key="as_fwd_a")
-    fwd_b_seq = st.text_area("Forward B sequence", height=150, key="as_fwd_b")
+    exon1 = ""
+    exon2 = ""
+    rev_a_seq = ""
+    rev_b_seq = ""
 
-    rev_a_seq = st.text_area("Reverse A sequence", height=150, key="as_rev_a")
-    rev_b_seq = st.text_area("Reverse B sequence (optional)", height=150, key="as_rev_b")
+    if needs_fwd_a:
+        exon1 = st.text_area("Forward A exon sequence", height=150, key="as_ex1")
+    if needs_fwd_b:
+        exon2 = st.text_area("Forward B exon sequence", height=150, key="as_ex2")
+    if needs_rev_a:
+        rev_a_seq = st.text_area("Reverse A exon sequence", height=150, key="as_rev_a")
+    if needs_rev_b:
+        rev_b_seq = st.text_area("Reverse B exon sequence (optional)", height=150, key="as_rev_b")
 
-    st.markdown("### Choose which primer pairs to generate")
-    c1, c2 = st.columns(2)
-    with c1:
-        use_fwd_a = st.checkbox("Use Forward A", value=True, key="as_use_fwd_a")
-        use_fwd_b = st.checkbox("Use Forward B", value=True, key="as_use_fwd_b")
-    with c2:
-        use_rev_a = st.checkbox("Use Reverse A", value=True, key="as_use_rev_a")
-        use_rev_b = st.checkbox("Use Reverse B", value=False, key="as_use_rev_b")
+    # Validate only what was selected
+    missing = []
+    if needs_fwd_a and not exon1:
+        missing.append("Forward A exon")
+    if needs_fwd_b and not exon2:
+        missing.append("Forward B exon")
+    if needs_rev_a and not rev_a_seq:
+        missing.append("Reverse A exon")
+    if needs_rev_b and not rev_b_seq:
+        missing.append("Reverse B exon")
+
+    if missing:
+        st.error("Please paste: " + ", ".join(missing) + ".")
+        st.stop()
 
     run = st.button("Design primers", key="as_run")
 
     if run:
-        if not fwd_a_seq or not fwd_b_seq or not rev_a_seq:
-            st.error("Please paste Forward A, Forward B, and at least Reverse A.")
-        elif (not use_fwd_a and not use_fwd_b) or (not use_rev_a and not use_rev_b):
-            st.error("Please select at least one forward and at least one reverse option.")
-        elif use_rev_b and not rev_b_seq:
-            st.error("You selected Reverse B but did not paste a Reverse B sequence.")
-        else:
-            try:
-                # Base design using Reverse A
-                p_fwd_a, p_fwd_b, p_rev_a = design_exon_primers(
-                    fwd_a_seq, fwd_b_seq, rev_a_seq,
+        try:
+            # We may need to run the primer engine once for REV A and once for REV B.
+            res_A = None
+            res_B = None
+
+            # If a forward exon is not needed (not selected), we still must provide something.
+            # To avoid confusing behavior, require the corresponding forward exon when any pair uses it (already enforced).
+            # If only FWD A pairs selected, exon2 can be empty; we pass exon2 as exon1 (dummy) but ignore p2 in output.
+            exon2_safe = exon2 if exon2 else exon1
+            exon1_safe = exon1 if exon1 else exon2_safe
+
+            if needs_rev_a:
+                p1A, p2A, p3A = design_exon_primers(
+                    exon1_safe, exon2_safe, rev_a_seq,
                     min_len=min_len,
                     max_len=max_len,
                     tm_target=tm_target,
                     tm_tol=tm_tol,
                     dimer_k=dimer_k
                 )
+                res_A = (p1A, p2A, p3A)
 
-                # Optional Reverse B (keep Forward A/B from Reverse A run for consistency)
-                p_rev_b = None
-                if use_rev_b and rev_b_seq:
-                    _, _, p_rev_b = design_exon_primers(
-                        fwd_a_seq, fwd_b_seq, rev_b_seq,
-                        min_len=min_len,
-                        max_len=max_len,
-                        tm_target=tm_target,
-                        tm_tol=tm_tol,
-                        dimer_k=dimer_k
-                    )
+            if needs_rev_b:
+                p1B, p2B, p3B = design_exon_primers(
+                    exon1_safe, exon2_safe, rev_b_seq,
+                    min_len=min_len,
+                    max_len=max_len,
+                    tm_target=tm_target,
+                    tm_tol=tm_tol,
+                    dimer_k=dimer_k
+                )
+                res_B = (p1B, p2B, p3B)
 
-                st.success("Primers designed successfully.")
-                st.caption(SCORE_EXPLANATION)
+            st.success("Primers designed successfully.")
+            st.caption(SCORE_EXPLANATION)
 
-                # Table of designed primers (show what exists, regardless of checkboxes)
-                rows = []
-                rows.append({"Primer": "FWD A", "Primer (5'→3')": p_fwd_a.seq_5to3, "Length": p_fwd_a.length, "Tm (°C)": round(p_fwd_a.tm_c, 1), "GC (%)": round(p_fwd_a.gc_pct, 1), "Score": round(p_fwd_a.score, 2)})
-                rows.append({"Primer": "FWD B", "Primer (5'→3')": p_fwd_b.seq_5to3, "Length": p_fwd_b.length, "Tm (°C)": round(p_fwd_b.tm_c, 1), "GC (%)": round(p_fwd_b.gc_pct, 1), "Score": round(p_fwd_b.score, 2)})
-                rows.append({"Primer": "REV A", "Primer (5'→3')": p_rev_a.seq_5to3, "Length": p_rev_a.length, "Tm (°C)": round(p_rev_a.tm_c, 1), "GC (%)": round(p_rev_a.gc_pct, 1), "Score": round(p_rev_a.score, 2)})
+            # Build output rows per selected pair
+            out_rows = []
+            blast_links = []
 
-                if p_rev_b is not None:
-                    rows.append({"Primer": "REV B", "Primer (5'→3')": p_rev_b.seq_5to3, "Length": p_rev_b.length, "Tm (°C)": round(p_rev_b.tm_c, 1), "GC (%)": round(p_rev_b.gc_pct, 1), "Score": round(p_rev_b.score, 2)})
+            org = "Homo sapiens"
 
-                st.dataframe(pd.DataFrame(rows), use_container_width=True)
+            def add_pair_rows(pair_name: str, fwd_obj, rev_obj):
+                out_rows.append({
+                    "Pair": pair_name,
+                    "Type": "FWD",
+                    "Primer (5'→3')": fwd_obj.seq_5to3,
+                    "Length": fwd_obj.length,
+                    "Tm (°C)": round(fwd_obj.tm_c, 1),
+                    "GC (%)": round(fwd_obj.gc_pct, 1),
+                    "Score": round(fwd_obj.score, 2),
+                })
+                out_rows.append({
+                    "Pair": pair_name,
+                    "Type": "REV",
+                    "Primer (5'→3')": rev_obj.seq_5to3,
+                    "Length": rev_obj.length,
+                    "Tm (°C)": round(rev_obj.tm_c, 1),
+                    "GC (%)": round(rev_obj.gc_pct, 1),
+                    "Score": round(rev_obj.score, 2),
+                })
+                blast_links.append((pair_name, primer_blast_url_pair(fwd_obj.seq_5to3, rev_obj.seq_5to3, org)))
 
-                st.subheader("Primer-BLAST links (NCBI)")
-                org = "Homo sapiens"
+            for p in selected_pairs:
+                if p == "FWD A + REV A":
+                    if res_A is None:
+                        continue
+                    p1A, p2A, p3A = res_A
+                    add_pair_rows("FWD A + REV A", p1A, p3A)
 
-                # Generate only the selected pairs
-                any_links = False
+                elif p == "FWD B + REV A":
+                    if res_A is None:
+                        continue
+                    p1A, p2A, p3A = res_A
+                    add_pair_rows("FWD B + REV A", p2A, p3A)
 
-                if use_fwd_a and use_rev_a:
-                    any_links = True
-                    st.markdown(f"**FWD A + REV A**: [Open in Primer-BLAST]({primer_blast_url_pair(p_fwd_a.seq_5to3, p_rev_a.seq_5to3, org)})")
+                elif p == "FWD A + REV B":
+                    if res_B is None:
+                        continue
+                    p1B, p2B, p3B = res_B
+                    add_pair_rows("FWD A + REV B", p1B, p3B)
 
-                if use_fwd_b and use_rev_a:
-                    any_links = True
-                    st.markdown(f"**FWD B + REV A**: [Open in Primer-BLAST]({primer_blast_url_pair(p_fwd_b.seq_5to3, p_rev_a.seq_5to3, org)})")
+                elif p == "FWD B + REV B":
+                    if res_B is None:
+                        continue
+                    p1B, p2B, p3B = res_B
+                    add_pair_rows("FWD B + REV B", p2B, p3B)
 
-                if use_rev_b and p_rev_b is not None:
-                    if use_fwd_a:
-                        any_links = True
-                        st.markdown(f"**FWD A + REV B**: [Open in Primer-BLAST]({primer_blast_url_pair(p_fwd_a.seq_5to3, p_rev_b.seq_5to3, org)})")
-                    if use_fwd_b:
-                        any_links = True
-                        st.markdown(f"**FWD B + REV B**: [Open in Primer-BLAST]({primer_blast_url_pair(p_fwd_b.seq_5to3, p_rev_b.seq_5to3, org)})")
+            if out_rows:
+                st.dataframe(pd.DataFrame(out_rows), use_container_width=True)
 
-                if not any_links:
-                    st.warning("No Primer-BLAST links were generated because none of the pair options were selected.")
-                else:
-                    st.info(BLAST_INSTRUCTIONS)
+            st.subheader("Primer-BLAST links (NCBI)")
+            for name, url in blast_links:
+                st.markdown(f"**{name}**: [Open in Primer-BLAST]({url})")
+            st.info(BLAST_INSTRUCTIONS)
 
-                with st.expander("Single-primer Primer-BLAST links"):
-                    st.markdown(f"**FWD A**: [Primer-BLAST]({primer_blast_url_single(p_fwd_a.seq_5to3, org)})")
-                    st.markdown(f"**FWD B**: [Primer-BLAST]({primer_blast_url_single(p_fwd_b.seq_5to3, org)})")
-                    st.markdown(f"**REV A**: [Primer-BLAST]({primer_blast_url_single(p_rev_a.seq_5to3, org)})")
-                    if p_rev_b is not None:
-                        st.markdown(f"**REV B**: [Primer-BLAST]({primer_blast_url_single(p_rev_b.seq_5to3, org)})")
+            # Dimer reports for each reverse set (only if generated)
+            if res_A is not None:
+                st.subheader("Dimer check (Reverse A set)")
+                p1A, p2A, p3A = res_A
+                print_dimer_report(p1A, p2A, p3A)
 
-                st.subheader("Dimer check (forward vs reverse)")
-                # Use the existing function with FWD A + FWD B + REV A (and note REV B separately if present)
-                print_dimer_report(p_fwd_a, p_fwd_b, p_rev_a)
-                if p_rev_b is not None:
-                    st.caption("Note: REV B was designed separately. Run Primer-BLAST for FWD/REV B pairs above for specificity.")
+            if res_B is not None:
+                st.subheader("Dimer check (Reverse B set)")
+                p1B, p2B, p3B = res_B
+                print_dimer_report(p1B, p2B, p3B)
 
-            except Exception as e:
-                st.error(str(e))
+            with st.expander("Single-primer Primer-BLAST links"):
+                if res_A is not None:
+                    p1A, p2A, p3A = res_A
+                    st.markdown(f"**FWD A**: [Primer-BLAST]({primer_blast_url_single(p1A.seq_5to3, org)})")
+                    st.markdown(f"**FWD B**: [Primer-BLAST]({primer_blast_url_single(p2A.seq_5to3, org)})")
+                    st.markdown(f"**REV A**: [Primer-BLAST]({primer_blast_url_single(p3A.seq_5to3, org)})")
+                if res_B is not None:
+                    p1B, p2B, p3B = res_B
+                    st.markdown(f"**REV B**: [Primer-BLAST]({primer_blast_url_single(p3B.seq_5to3, org)})")
+
+        except Exception as e:
+            st.error(str(e))
 
     add_footer()
 
