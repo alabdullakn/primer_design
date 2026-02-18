@@ -29,6 +29,7 @@ SCORE_EXPLANATION = (
     "This is not a BLAST score and not experimental validation."
 )
 
+# Option 1 (copy-paste style)
 FOOTER_TEXT = (
     "This tool is free and open to everyone. "
     "It was designed and built by Khalid Alabdulla. "
@@ -39,7 +40,7 @@ FOOTER_TEXT = (
 
 def add_footer():
     st.markdown("---")
-    st.markdown(FOOTER_TEXT)
+    st.caption(FOOTER_TEXT)
 
 # ---------------- Primer-BLAST URL helpers ----------------
 
@@ -234,7 +235,7 @@ def design_basic_pcr_primers(
     if best is None:
         raise ValueError("Could not find a primer pair that matches your amplicon size. Widen amplicon range or windows.")
 
-    return best
+    return best  # fwd, rev, amp_len, fwd_start, rev_site_start
 
 # ===========================
 # Streamlit UI
@@ -242,10 +243,14 @@ def design_basic_pcr_primers(
 
 st.set_page_config(page_title="Primer Designer", layout="wide")
 
-# Shorter tab labels so qPCR never gets hidden
-tabs = st.tabs(["Basic PCR", "Alt splicing", "qPCR"])
+tabs = st.tabs([
+    "Basic PCR (two primers from one sequence)",
+    "Alternative splicing (Exon primers)",
+    "qPCR (junction primers)"
+])
 
 # -------- Tab 1: Basic PCR --------
+
 with tabs[0]:
     st.title("Basic PCR Primer Tool")
     st.write("Paste one DNA sequence and get a forward and reverse primer (no junction required).")
@@ -264,6 +269,15 @@ with tabs[0]:
         basic_end_win = st.number_input("Reverse search window (bp from end)", 50, 3000, 300, key="basic_end_win")
         basic_amp_min = st.number_input("Amplicon min (bp)", 50, 5000, 100, key="basic_amp_min")
         basic_amp_max = st.number_input("Amplicon max (bp)", 80, 8000, 400, key="basic_amp_max")
+
+    st.markdown(
+        """
+**How to use**
+1) Paste your template sequence (A/C/G/T only).  
+2) The tool searches for a forward primer near the beginning and a reverse primer near the end.  
+3) You control the amplicon size range.  
+        """
+    )
 
     template = st.text_area(
         "Template sequence (A/C/G/T only)",
@@ -295,10 +309,8 @@ with tabs[0]:
                 st.caption(SCORE_EXPLANATION)
 
                 rows = [
-                    {"Type": "FWD", "Primer (5'→3')": fwd, "Length": len(fwd), "Tm (°C)": round(tm_wallace(fwd), 1),
-                     "GC (%)": round(gc_pct(fwd), 1), "Score": round(primer_score(fwd, tm_target), 2)},
-                    {"Type": "REV", "Primer (5'→3')": rev, "Length": len(rev), "Tm (°C)": round(tm_wallace(rev), 1),
-                     "GC (%)": round(gc_pct(rev), 1), "Score": round(primer_score(rev, tm_target), 2)},
+                    {"Type": "FWD", "Primer (5'→3')": fwd, "Length": len(fwd), "Tm (°C)": round(tm_wallace(fwd), 1), "GC (%)": round(gc_pct(fwd), 1), "Score": round(primer_score(fwd, tm_target), 2)},
+                    {"Type": "REV", "Primer (5'→3')": rev, "Length": len(rev), "Tm (°C)": round(tm_wallace(rev), 1), "GC (%)": round(gc_pct(rev), 1), "Score": round(primer_score(rev, tm_target), 2)},
                 ]
                 st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
@@ -315,10 +327,12 @@ with tabs[0]:
     add_footer()
 
 # -------- Tab 2: Alternative splicing --------
+
 with tabs[1]:
     st.title("Exon Primer Design Tool")
-    st.write("Design exon-specific primers with Tm optimization, dimer checks, and Primer-BLAST links.")
+    st.write("Design exon-specific primers with Tm optimization, dimer checks, and direct Primer-BLAST links.")
 
+    # Pair selection ABOVE sequences, max 3
     st.subheader("Choose which primer pairs to generate (max 3)")
     pair_options = [
         "FWD A + REV A",
@@ -344,22 +358,34 @@ with tabs[1]:
             max_len = st.number_input("Max primer length", 16, 40, 25, key="as_max_len")
             tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 15.0, 5.0, key="as_tm_tol")
 
+    # Decide which sequences are needed based on selected pairs
     needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
     needs_fwd_b = any(p.startswith("FWD B") for p in selected_pairs)
     needs_rev_a = any(p.endswith("REV A") for p in selected_pairs)
     needs_rev_b = any(p.endswith("REV B") for p in selected_pairs)
 
+    if len(selected_pairs) == 0:
+        st.error("Please select at least one primer pair.")
+        st.stop()
+
     st.subheader("Paste exon sequences (A/C/G/T only)")
 
-    exon1 = st.text_area("Forward A exon sequence", height=150, key="as_ex1") if needs_fwd_a else ""
-    exon2 = st.text_area("Forward B exon sequence", height=150, key="as_ex2") if needs_fwd_b else ""
-    rev_a_seq = st.text_area("Reverse A exon sequence", height=150, key="as_rev_a") if needs_rev_a else ""
-    rev_b_seq = st.text_area("Reverse B exon sequence", height=150, key="as_rev_b") if needs_rev_b else ""
+    exon1 = ""
+    exon2 = ""
+    rev_a_seq = ""
+    rev_b_seq = ""
 
-    # Validate without st.stop(), so qPCR tab always renders
+    if needs_fwd_a:
+        exon1 = st.text_area("Forward A exon sequence", height=150, key="as_ex1")
+    if needs_fwd_b:
+        exon2 = st.text_area("Forward B exon sequence", height=150, key="as_ex2")
+    if needs_rev_a:
+        rev_a_seq = st.text_area("Reverse A exon sequence", height=150, key="as_rev_a")
+    if needs_rev_b:
+        rev_b_seq = st.text_area("Reverse B exon sequence (optional)", height=150, key="as_rev_b")
+
+    # Validate only what was selected
     missing = []
-    if len(selected_pairs) == 0:
-        missing.append("at least one primer pair selection")
     if needs_fwd_a and not exon1:
         missing.append("Forward A exon")
     if needs_fwd_b and not exon2:
@@ -369,18 +395,21 @@ with tabs[1]:
     if needs_rev_b and not rev_b_seq:
         missing.append("Reverse B exon")
 
-    valid_inputs = (len(missing) == 0)
+    if missing:
+        st.error("Please paste: " + ", ".join(missing) + ".")
+        st.stop()
 
-    if not valid_inputs:
-        st.error("Please provide: " + ", ".join(missing) + ".")
+    run = st.button("Design primers", key="as_run")
 
-    run = st.button("Design primers", key="as_run", disabled=not valid_inputs)
-
-    if run and valid_inputs:
+    if run:
         try:
+            # We may need to run the primer engine once for REV A and once for REV B.
             res_A = None
             res_B = None
 
+            # If a forward exon is not needed (not selected), we still must provide something.
+            # To avoid confusing behavior, require the corresponding forward exon when any pair uses it (already enforced).
+            # If only FWD A pairs selected, exon2 can be empty; we pass exon2 as exon1 (dummy) but ignore p2 in output.
             exon2_safe = exon2 if exon2 else exon1
             exon1_safe = exon1 if exon1 else exon2_safe
 
@@ -409,34 +438,55 @@ with tabs[1]:
             st.success("Primers designed successfully.")
             st.caption(SCORE_EXPLANATION)
 
+            # Build output rows per selected pair
             out_rows = []
             blast_links = []
+
             org = "Homo sapiens"
 
             def add_pair_rows(pair_name: str, fwd_obj, rev_obj):
                 out_rows.append({
-                    "Pair": pair_name, "Type": "FWD", "Primer (5'→3')": fwd_obj.seq_5to3,
-                    "Length": fwd_obj.length, "Tm (°C)": round(fwd_obj.tm_c, 1),
-                    "GC (%)": round(fwd_obj.gc_pct, 1), "Score": round(fwd_obj.score, 2),
+                    "Pair": pair_name,
+                    "Type": "FWD",
+                    "Primer (5'→3')": fwd_obj.seq_5to3,
+                    "Length": fwd_obj.length,
+                    "Tm (°C)": round(fwd_obj.tm_c, 1),
+                    "GC (%)": round(fwd_obj.gc_pct, 1),
+                    "Score": round(fwd_obj.score, 2),
                 })
                 out_rows.append({
-                    "Pair": pair_name, "Type": "REV", "Primer (5'→3')": rev_obj.seq_5to3,
-                    "Length": rev_obj.length, "Tm (°C)": round(rev_obj.tm_c, 1),
-                    "GC (%)": round(rev_obj.gc_pct, 1), "Score": round(rev_obj.score, 2),
+                    "Pair": pair_name,
+                    "Type": "REV",
+                    "Primer (5'→3')": rev_obj.seq_5to3,
+                    "Length": rev_obj.length,
+                    "Tm (°C)": round(rev_obj.tm_c, 1),
+                    "GC (%)": round(rev_obj.gc_pct, 1),
+                    "Score": round(rev_obj.score, 2),
                 })
                 blast_links.append((pair_name, primer_blast_url_pair(fwd_obj.seq_5to3, rev_obj.seq_5to3, org)))
 
             for p in selected_pairs:
-                if p == "FWD A + REV A" and res_A is not None:
+                if p == "FWD A + REV A":
+                    if res_A is None:
+                        continue
                     p1A, p2A, p3A = res_A
                     add_pair_rows("FWD A + REV A", p1A, p3A)
-                elif p == "FWD B + REV A" and res_A is not None:
+
+                elif p == "FWD B + REV A":
+                    if res_A is None:
+                        continue
                     p1A, p2A, p3A = res_A
                     add_pair_rows("FWD B + REV A", p2A, p3A)
-                elif p == "FWD A + REV B" and res_B is not None:
+
+                elif p == "FWD A + REV B":
+                    if res_B is None:
+                        continue
                     p1B, p2B, p3B = res_B
                     add_pair_rows("FWD A + REV B", p1B, p3B)
-                elif p == "FWD B + REV B" and res_B is not None:
+
+                elif p == "FWD B + REV B":
+                    if res_B is None:
+                        continue
                     p1B, p2B, p3B = res_B
                     add_pair_rows("FWD B + REV B", p2B, p3B)
 
@@ -448,6 +498,7 @@ with tabs[1]:
                 st.markdown(f"**{name}**: [Open in Primer-BLAST]({url})")
             st.info(BLAST_INSTRUCTIONS)
 
+            # Dimer reports for each reverse set (only if generated)
             if res_A is not None:
                 st.subheader("Dimer check (Reverse A set)")
                 p1A, p2A, p3A = res_A
@@ -474,9 +525,30 @@ with tabs[1]:
     add_footer()
 
 # -------- Tab 3: qPCR junction primers --------
+
 with tabs[2]:
     st.title("qPCR Junction Primer Tool")
-    st.write("Design qPCR primers where the forward primer spans an exon-exon junction.")
+    st.write("Design qPCR primers where the forward primer spans an exon–exon junction.")
+
+    st.markdown(
+        """
+**How to get a transcript sequence with exon boundaries**
+- Use AceView (NCBI): https://www.ncbi.nlm.nih.gov/IEB/Research/Acembly/index.html?human  
+- Search your gene and open a transcript to view the spliced sequence  
+- Copy the spliced cDNA sequence and choose the junction you want  
+
+**How to use this tab**
+1) Paste the full spliced sequence (cDNA) below  
+2) Mark the exon junction with exactly one `|`  
+3) Example:
+- `...AAGGACCTGATGCTGAC|GTTCCAGGAGTCTGACT...`
+
+**What you get**
+- Junction-spanning forward primer  
+- Reverse primer downstream (amplicon size controlled)  
+- Paired Primer-BLAST link  
+        """
+    )
 
     with st.expander("Edit primer conditions", expanded=False):
         c1, c2 = st.columns(2)
@@ -523,12 +595,8 @@ with tabs[2]:
                 st.caption(SCORE_EXPLANATION)
 
                 rows = [
-                    {"Type": "FWD (junction)", "Primer (5'→3')": fwd, "Length": len(fwd),
-                     "Tm (°C)": round(tm_wallace(fwd), 1), "GC (%)": round(gc_pct(fwd), 1),
-                     "Score": round(primer_score(fwd, tm_target), 2)},
-                    {"Type": "REV", "Primer (5'→3')": rev, "Length": len(rev),
-                     "Tm (°C)": round(tm_wallace(rev), 1), "GC (%)": round(gc_pct(rev), 1),
-                     "Score": round(primer_score(rev, tm_target), 2)},
+                    {"Type": "FWD (junction)", "Primer (5'→3')": fwd, "Length": len(fwd), "Tm (°C)": round(tm_wallace(fwd), 1), "GC (%)": round(gc_pct(fwd), 1), "Score": round(primer_score(fwd, tm_target), 2)},
+                    {"Type": "REV", "Primer (5'→3')": rev, "Length": len(rev), "Tm (°C)": round(tm_wallace(rev), 1), "GC (%)": round(gc_pct(rev), 1), "Score": round(primer_score(rev, tm_target), 2)},
                 ]
                 st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
