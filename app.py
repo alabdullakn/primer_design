@@ -33,6 +33,7 @@ FOOTER_TEXT = (
     "This tool is free and open to everyone. "
     "It was designed and built by Khalid Alabdulla. "
     "If you find it useful, please consider sharing it."
+    ""
     "If you have feedback or find a bug, email alabdulla8932@gmail.com"
 )
 
