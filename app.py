@@ -1,29 +1,38 @@
 import streamlit as st
 import pandas as pd
+import urllib.parse
 
 from primer_engine import (
     design_exon_primers,
-    attach_blast,
     print_dimer_report
 )
+
+def primer_blast_url(primer_seq: str, organism: str = "Homo sapiens") -> str:
+    params = {
+        "PRIMER_LEFT_INPUT": primer_seq,
+        "ORGANISM": organism
+    }
+    return "https://www.ncbi.nlm.nih.gov/tools/primer-blast/index.cgi?" + urllib.parse.urlencode(params)
+
 
 st.set_page_config(page_title="Exon Primer Designer", layout="wide")
 
 st.title("Exon Primer Design Tool")
-st.write(
-    "Design exon-specific primers with Tm optimization, dimer checks, and optional BLAST specificity."
-)
+st.write("Design exon-specific primers with Tm optimization and dimer checks. Includes Primer-BLAST links for specificity.")
 
 with st.sidebar:
     st.header("Primer settings")
-
     min_len = st.number_input("Min primer length", 16, 30, 16)
     max_len = st.number_input("Max primer length", 16, 40, 25)
     tm_target = st.number_input("Target Tm (°C)", 50.0, 70.0, 60.0)
     tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 10.0, 5.0)
     dimer_k = st.number_input("3' dimer check k", 3, 8, 4)
 
-    do_blast = st.checkbox("Run BLAST specificity check (slow)", value=False)
+    organism_name = st.selectbox(
+        "Organism for Primer-BLAST links",
+        ["Homo sapiens", "Mus musculus", "Rattus norvegicus"],
+        index=0
+    )
 
 st.subheader("Paste exon sequences (A/C/G/T only)")
 
@@ -50,16 +59,6 @@ if run:
             )
 
             primers = [f1, f2, r3]
-
-            if do_blast:
-                attach_blast(
-                    primers,
-                    do_blast=True,
-                    database="refseq_rna",
-                    organism_filter="Homo sapiens[Organism]",
-                    hitlist_size=10
-                )
-
             st.success("Primers designed successfully.")
 
             rows = []
@@ -77,23 +76,13 @@ if run:
             df = pd.DataFrame(rows)
             st.dataframe(df, use_container_width=True)
 
+            st.subheader("Primer-BLAST links (NCBI)")
+            for p in primers:
+                url = primer_blast_url(p.seq_5to3, organism=organism_name)
+                st.markdown(f"**{p.kind} ({p.exon_name})**: [Open in Primer-BLAST]({url})")
+
             st.subheader("Dimer check (forward vs reverse)")
             print_dimer_report(f1, f2, r3)
-
-            if do_blast:
-                st.subheader("BLAST summary")
-                for p in primers:
-                    st.markdown(f"**{p.kind} ({p.exon_name})**")
-                    if p.blast is None:
-                        st.write("No BLAST data.")
-                    elif not p.blast.ok:
-                        st.write(f"BLAST failed: {p.blast.note}")
-                    else:
-                        st.write(f"Hits returned: {p.blast.hits_returned}")
-                        if p.blast.hits_returned and p.blast.hits_returned > 0:
-                            st.write(f"Top hit: {p.blast.top_hit_def}")
-                            st.write(f"Identity: {p.blast.top_identity_pct:.1f}%")
-                            st.write(f"E-value: {p.blast.top_evalue}")
 
         except Exception as e:
             st.error(str(e))
