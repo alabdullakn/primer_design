@@ -161,7 +161,6 @@ def design_basic_pcr_primers(template: str,
     if len(s) < max(amplicon_min, 80):
         raise ValueError("Sequence is too short. Paste a longer template sequence.")
 
-    # forward candidates in first start_window bases
     start_window = min(start_window, len(s))
     fwd_candidates = []
     for L in range(min_len, max_len + 1):
@@ -174,7 +173,6 @@ def design_basic_pcr_primers(template: str,
     if not fwd_candidates:
         raise ValueError("No forward primer found. Increase Tm tolerance or start window or length range.")
 
-    # reverse candidates in last end_window bases
     end_window = min(end_window, len(s))
     rev_candidates = []
     end_start = max(0, len(s) - end_window)
@@ -189,7 +187,6 @@ def design_basic_pcr_primers(template: str,
     if not rev_candidates:
         raise ValueError("No reverse primer found. Increase Tm tolerance or end window or length range.")
 
-    # choose best pair by score + amplicon constraint
     best = None
     best_key = None
     for fwd, f_i in fwd_candidates:
@@ -219,38 +216,35 @@ tabs = st.tabs([
     "qPCR (junction primers)"
 ])
 
-with st.sidebar:
-    st.header("Primer settings")
-    min_len = st.number_input("Min primer length", 16, 30, 16)
-    max_len = st.number_input("Max primer length", 16, 40, 25)
-    tm_target = st.number_input("Target Tm (°C)", 50.0, 70.0, 60.0)
-    tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 15.0, 5.0)
-
 # -------- Tab 1: Basic PCR --------
 
 with tabs[0]:
     st.title("Basic PCR Primer Tool")
     st.write("Paste one DNA sequence and get a forward and reverse primer (no junction required).")
 
+    with st.expander("Edit primer conditions", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            min_len = st.number_input("Min primer length", 16, 30, 16, key="basic_min_len")
+            tm_target = st.number_input("Target Tm (°C)", 50.0, 70.0, 60.0, key="basic_tm_target")
+        with c2:
+            max_len = st.number_input("Max primer length", 16, 40, 25, key="basic_max_len")
+            tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 15.0, 5.0, key="basic_tm_tol")
+
+        st.subheader("Basic PCR options")
+        basic_start_win = st.number_input("Forward search window (bp from start)", 50, 3000, 300, key="basic_start_win")
+        basic_end_win = st.number_input("Reverse search window (bp from end)", 50, 3000, 300, key="basic_end_win")
+        basic_amp_min = st.number_input("Amplicon min (bp)", 50, 5000, 100, key="basic_amp_min")
+        basic_amp_max = st.number_input("Amplicon max (bp)", 80, 8000, 400, key="basic_amp_max")
+
     st.markdown(
         """
 **How to use**
 1) Paste your template sequence (A/C/G/T only).  
-2) The tool searches for:
-- a forward primer near the beginning
-- a reverse primer near the end  
-3) You control the amplicon size range.
-
-If you want to check specificity, use the Primer-BLAST link at the bottom.
+2) The tool searches for a forward primer near the beginning and a reverse primer near the end.  
+3) You control the amplicon size range.  
         """
     )
-
-    with st.sidebar:
-        st.subheader("Basic PCR options")
-        basic_start_win = st.number_input("Forward search window (bp from start)", 50, 3000, 300)
-        basic_end_win = st.number_input("Reverse search window (bp from end)", 50, 3000, 300)
-        basic_amp_min = st.number_input("Amplicon min (bp)", 50, 5000, 100)
-        basic_amp_max = st.number_input("Amplicon max (bp)", 80, 8000, 400)
 
     template = st.text_area(
         "Template sequence (A/C/G/T only)",
@@ -301,9 +295,15 @@ with tabs[1]:
     st.title("Exon Primer Design Tool")
     st.write("Design exon-specific primers with Tm optimization, dimer checks, and direct Primer-BLAST links.")
 
-    with st.sidebar:
-        st.subheader("Alt splicing options")
-        dimer_k = st.number_input("3' dimer check k", 3, 8, 4)
+    with st.expander("Edit primer conditions", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            min_len = st.number_input("Min primer length", 16, 30, 16, key="as_min_len")
+            tm_target = st.number_input("Target Tm (°C)", 50.0, 70.0, 60.0, key="as_tm_target")
+            dimer_k = st.number_input("3' dimer check k", 3, 8, 4, key="as_dimer_k")
+        with c2:
+            max_len = st.number_input("Max primer length", 16, 40, 25, key="as_max_len")
+            tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 15.0, 5.0, key="as_tm_tol")
 
     st.subheader("Paste exon sequences (A/C/G/T only)")
     exon1 = st.text_area("Exon 1 sequence", height=150, key="as_ex1")
@@ -360,9 +360,9 @@ with tabs[2]:
     st.markdown(
         """
 **How to get a transcript sequence with exon boundaries**
-- Use AceView (NCBI): https://www.ncbi.nlm.nih.gov/IEB/Research/Acembly/index.html?human
-- Search your gene and open a transcript to view the spliced sequence.
-- Copy the spliced cDNA sequence and choose the junction you want.
+- Use AceView (NCBI): https://www.ncbi.nlm.nih.gov/IEB/Research/Acembly/index.html?human  
+- Search your gene and open a transcript to view the spliced sequence  
+- Copy the spliced cDNA sequence and choose the junction you want  
 
 **How to use this tab**
 1) Paste the full spliced sequence (cDNA) below  
@@ -371,18 +371,26 @@ with tabs[2]:
 - `...AAGGACCTGATGCTGAC|GTTCCAGGAGTCTGACT...`
 
 **What you get**
-- Junction-spanning forward primer
-- Reverse primer downstream (amplicon size controlled)
-- Paired Primer-BLAST link
+- Junction-spanning forward primer  
+- Reverse primer downstream (amplicon size controlled)  
+- Paired Primer-BLAST link  
         """
     )
 
-    with st.sidebar:
+    with st.expander("Edit primer conditions", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            min_len = st.number_input("Min primer length", 16, 30, 16, key="qpcr_min_len")
+            tm_target = st.number_input("Target Tm (°C)", 50.0, 70.0, 60.0, key="qpcr_tm_target")
+        with c2:
+            max_len = st.number_input("Max primer length", 16, 40, 25, key="qpcr_max_len")
+            tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 15.0, 5.0, key="qpcr_tm_tol")
+
         st.subheader("qPCR options")
-        min_junc = st.number_input("Min bases overlapping each side of junction", 4, 12, 6)
-        amp_min = st.number_input("Amplicon min (bp)", 50, 300, 70)
-        amp_max = st.number_input("Amplicon max (bp)", 80, 600, 200)
-        down_win = st.number_input("Downstream search window (bp)", 150, 2000, 600)
+        min_junc = st.number_input("Min bases overlapping each side of junction", 4, 12, 6, key="qpcr_min_junc")
+        amp_min = st.number_input("Amplicon min (bp)", 50, 300, 70, key="qpcr_amp_min")
+        amp_max = st.number_input("Amplicon max (bp)", 80, 600, 200, key="qpcr_amp_max")
+        down_win = st.number_input("Downstream search window (bp)", 150, 2000, 600, key="qpcr_down_win")
 
     seq_full = st.text_area(
         "Full sequence with junction marker |",
