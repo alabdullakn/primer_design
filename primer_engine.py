@@ -345,3 +345,197 @@ def print_dimer_report(f1: PrimerHit, f2: PrimerHit, r3: PrimerHit) -> None:
         })
 
     st.table(rows)
+
+
+
+
+
+### qpcr 
+
+from dataclasses import dataclass
+from typing import Optional, Tuple, List
+
+# Reuse your existing helpers if they already exist in primer_engine.py
+# If you already have these functions, do NOT duplicate them.
+# clean_seq, revcomp, gc_content, tm_wallace, max_run, has_3prime_gc_clamp, self_complementarity_flag, score_candidate
+# and PrimerHit dataclass
+
+def parse_junction_marked_seq(seq_with_marker: str, marker: str = "^") -> Tuple[str, str]:
+    s = clean_seq(seq_with_marker.replace(marker, ""))
+    if marker not in seq_with_marker:
+        raise ValueError("For qPCR, mark the exon-exon junction using '^' inside the sequence.")
+    left_raw, right_raw = seq_with_marker.split(marker, 1)
+    left = clean_seq(left_raw)
+    right = clean_seq(right_raw)
+    if len(left) < 10 or len(right) < 10:
+        raise ValueError("Junction sides are too short. Paste more bases on each side of '^'.")
+    return left, right
+
+def build_junction_primer_forward(left: str, right: str, left_take: int, right_take: int) -> str:
+    # Primer is written 5'->3' as ordered, crossing junction
+    return left[-left_take:] + right[:right_take]
+
+def build_junction_primer_reverse(left: str, right: str, left_take: int, right_take: int) -> str:
+    # Reverse primer spans junction on the minus strand
+    template = left[-left_take:] + right[:right_take]
+    return revcomp(template)
+
+def design_qpcr_junction_primers(
+    seq_with_junction_marker: str,
+    span_primer: str = "FWD",           # "FWD" or "REV" spans the junction
+    min_len: int = 18,
+    max_len: int = 25,
+    tm_target: float = 60.0,
+    tm_tol: float = 5.0,
+    amplicon_min: int = 70,
+    amplicon_max: int = 200,
+    junction_min_overlap_each_side: int = 6
+) -> Tuple["PrimerHit", "PrimerHit"]:
+    """
+    Returns (forward, reverse) primers.
+    One primer is forced to span the junction.
+    The partner primer is chosen to yield a short amplicon on the spliced template.
+    """
+
+    left, right = parse_junction_marked_seq(seq_with_junction_marker, marker="^")
+
+    # Build full spliced template used for partner search
+    template = left + right
+    junction_index = len(left)  # 0-based index in template where right starts
+
+    best_pair = None  # (score_sum, fwd_hit, rev_hit)
+
+    # Enumerate junction spanning primer lengths by choosing how many bases from each side
+    for L in range(min_len, max_len + 1):
+        # need at least junction_min_overlap_each_side from each side
+        for left_take in range(junction_min_overlap_each_side, L - junction_min_overlap_each_side + 1):
+            right_take = L - left_take
+            if right_take < junction_min_overlap_each_side:
+                continue
+
+            if span_primer.upper() == "FWD":
+                jseq = build_junction_primer_forward(left, right, left_take, right_take)
+                j_scored = score_candidate(jseq, tm_target, tm_tol)
+                if j_scored is None:
+                    continue
+                j_score, j_tm, j_gc = j_scored
+                fwd_hit = PrimerHit(
+                    kind="FWD",
+                    exon_name="Junction",
+                    start_0based=junction_index - left_take,
+                    length=L,
+                    seq_5to3=jseq,
+                    tm_c=j_tm,
+                    gc_pct=j_gc,
+                    score=j_score
+                )
+
+                # Partner reverse primer should bind on the right side to make small amplicon
+                # We search reverse primer binding sites on the template within amplicon window
+                # Reverse primer binds to template region downstream of forward 3' end
+                fwd_3prime_pos = fwd_hit.start_0based + fwd_hit.length  # first base after primer on template
+                search_start = fwd_3prime_pos + amplicon_min - 1
+                search_end = min(len(template), fwd_3prime_pos + amplicon_max)
+
+                if search_start >= search_end:
+                    continue
+
+                best_rev = None
+                for Lr in range(min_len, max_len + 1):
+                    for i in range(search_start, search_end - Lr + 1):
+                        bind_site = template[i:i + Lr]
+                        rev_seq = revcomp(bind_site)
+                        r_scored = score_candidate(rev_seq, tm_target, tm_tol)
+                        if r_scored is None:
+                            continue
+                        r_score, r_tm, r_gc = r_scored
+                        rev_hit = PrimerHit(
+                            kind="REV",
+                            exon_name="RightSide",
+                            start_0based=i,
+                            length=Lr,
+                            seq_5to3=rev_seq,
+                            tm_c=r_tm,
+                            gc_pct=r_gc,
+                            score=r_score,
+                            template_seq_5to3=bind_site
+                        )
+                        if best_rev is None or rev_hit.score < best_rev.score:
+                            best_rev = rev_hit
+
+                if best_rev is None:
+                    continue
+
+                total = fwd_hit.score + best_rev.score
+                if best_pair is None or total < best_pair[0]:
+                    best_pair = (total, fwd_hit, best_rev)
+
+            else:
+                # span_primer == "REV": reverse primer spans junction, forward primer upstream on left side
+                jseq = build_junction_primer_reverse(left, right, left_take, right_take)
+                j_scored = score_candidate(jseq, tm_target, tm_tol)
+                if j_scored is None:
+                    continue
+                j_score, j_tm, j_gc = j_scored
+                rev_hit = PrimerHit(
+                    kind="REV",
+                    exon_name="Junction",
+                    start_0based=junction_index - left_take,
+                    length=L,
+                    seq_5to3=jseq,
+                    tm_c=j_tm,
+                    gc_pct=j_gc,
+                    score=j_score,
+                    template_seq_5to3=(left[-left_take:] + right[:right_take])
+                )
+
+                # Partner forward primer should be on the left side to make small amplicon
+                # Forward primer binds upstream of reverse binding site.
+                rev_bind_start = rev_hit.start_0based  # reverse binds here (binding site start on template)
+                search_end = max(0, rev_bind_start - amplicon_min + 1)
+                search_start = max(0, rev_bind_start - amplicon_max)
+
+                if search_start >= search_end:
+                    continue
+
+                best_fwd = None
+                for Lf in range(min_len, max_len + 1):
+                    for i in range(search_start, search_end - Lf + 1):
+                        fseq = template[i:i + Lf]
+                        f_scored = score_candidate(fseq, tm_target, tm_tol)
+                        if f_scored is None:
+                            continue
+                        f_score, f_tm, f_gc = f_scored
+                        fwd_hit = PrimerHit(
+                            kind="FWD",
+                            exon_name="LeftSide",
+                            start_0based=i,
+                            length=Lf,
+                            seq_5to3=fseq,
+                            tm_c=f_tm,
+                            gc_pct=f_gc,
+                            score=f_score
+                        )
+                        if best_fwd is None or fwd_hit.score < best_fwd.score:
+                            best_fwd = fwd_hit
+
+                if best_fwd is None:
+                    continue
+
+                total = best_fwd.score + rev_hit.score
+                if best_pair is None or total < best_pair[0]:
+                    best_pair = (total, best_fwd, rev_hit)
+
+    if best_pair is None:
+        raise RuntimeError("No qPCR junction primer pair found with your constraints. Try wider Tm tolerance or length range.")
+
+    _, best_fwd, best_rev = best_pair
+    return best_fwd, best_rev
+
+def qpcr_amplicon_size(template_seq_with_marker: str, fwd: "PrimerHit", rev: "PrimerHit") -> int:
+    # Amplicon size on spliced template = from fwd start to end of rev binding site
+    left, right = parse_junction_marked_seq(template_seq_with_marker, marker="^")
+    template = left + right
+    rev_end = rev.start_0based + rev.length
+    return max(0, rev_end - fwd.start_0based)
+
