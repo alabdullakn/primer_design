@@ -1,3 +1,7 @@
+from ui.styles import apply_styles
+
+apply_styles()
+
 import streamlit as st
 from ui.styles import apply_styles
 from designers.regular_pcr import render as render_regular
