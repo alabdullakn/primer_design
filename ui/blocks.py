@@ -19,9 +19,11 @@ SCORE_EXPLANATION = (
 )
 
 FOOTER_TEXT = (
-    "Free and open to everyone. Built by Khalid Alabdulla. "
-    "If you find it useful, please share it. "
-    "Feedback or bugs: alabdulla8932@gmail.com"
+    "This tool is free and open to everyone. "
+    "It was designed and built by Khalid Alabdulla. "
+    "If you find it useful, please consider sharing it. "
+    "For feedback or bug reports, contact "
+    "[alabdulla8932@gmail.com](mailto:alabdulla8932@gmail.com)."
 )
 
 def add_footer():
