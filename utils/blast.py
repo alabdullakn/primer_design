@@ -1,3 +1,4 @@
+# utils/blast.py
 import urllib.parse
 
 def primer_blast_url_pair(fwd_seq: str, rev_seq: str, organism: str = "Homo sapiens") -> str:
