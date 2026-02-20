@@ -80,63 +80,76 @@ def render():
     # Sequence input (one template box)
     # ============================
 
-    st.subheader("Sequence input")
+    # ============================
+# Sequence input (one template box)
+# ============================
 
-    mode = st.radio(
-        "Choose input type",
-        ["Paste sequence", "Upload FASTA", "NCBI accession"],
-        horizontal=True,
-        key="reg_input_mode",
-    )
+st.subheader("Sequence input")
 
-    if mode == "Upload FASTA":
-        file = st.file_uploader("Upload FASTA file", type=["fa", "fasta", "txt"], key="reg_fasta")
-        if file is not None:
-            content = file.read().decode("utf-8", errors="ignore")
-            seq = _parse_fasta_text(content)
+if "reg_template" not in st.session_state:
+    st.session_state["reg_template"] = ""
+if "reg_last_fetch_msg" not in st.session_state:
+    st.session_state["reg_last_fetch_msg"] = ""
+
+mode = st.radio(
+    "Choose input type",
+    ["Paste sequence", "Upload FASTA", "NCBI accession"],
+    horizontal=True,
+    key="reg_input_mode",
+)
+
+# Upload FASTA
+if mode == "Upload FASTA":
+    file = st.file_uploader("Upload FASTA file", type=["fa", "fasta", "txt"], key="reg_fasta")
+    if file is not None:
+        content = file.read().decode("utf-8", errors="ignore")
+        seq = _parse_fasta_text(content)
+        st.session_state["reg_template"] = seq
+        st.session_state["reg_last_fetch_msg"] = f"Loaded FASTA | length: {len(seq)}"
+
+# NCBI accession
+if mode == "NCBI accession":
+    acc = st.text_input("Enter NCBI accession", key="reg_ncbi_acc")
+    if st.button("Fetch from NCBI", key="reg_fetch_btn"):
+        try:
+            fasta = _fetch_ncbi_fasta(acc)
+            seq = _parse_fasta_text(fasta)
             st.session_state["reg_template"] = seq
-            st.session_state["reg_last_fetch_msg"] = f"Loaded FASTA | length: {len(seq)}"
+            st.session_state["reg_last_fetch_msg"] = f"Fetched {acc} | length: {len(seq)}"
+            st.rerun()
+        except Exception as e:
+            st.session_state["reg_last_fetch_msg"] = ""
+            st.error(str(e))
 
-    if mode == "NCBI accession":
-        acc = st.text_input("Enter NCBI accession", key="reg_ncbi_acc")
-        if st.button("Fetch from NCBI", key="reg_fetch_btn"):
-            try:
-                fasta = _fetch_ncbi_fasta(acc)
-                seq = _parse_fasta_text(fasta)
-                st.session_state["reg_template"] = seq
-                st.session_state["reg_last_fetch_msg"] = f"Fetched {acc} | length: {len(seq)}"
-            except Exception as e:
-                st.session_state["reg_last_fetch_msg"] = ""
-                st.error(str(e))
+if st.session_state["reg_last_fetch_msg"]:
+    st.success(st.session_state["reg_last_fetch_msg"])
 
-    if st.session_state["reg_last_fetch_msg"]:
-        st.success(st.session_state["reg_last_fetch_msg"])
+# One template box that always holds the template used
+template_text = st.text_area(
+    "Template sequence (FASTA or raw). We will keep A/C/G/T only.",
+    height=220,
+    value=st.session_state["reg_template"],
+    key="reg_template_box",
+    placeholder="Paste here (you can also upload FASTA or fetch by accession above)...",
+)
 
-    template_text = st.text_area(
-        "Template sequence (FASTA or raw). We will keep A/C/G/T only.",
-        height=220,
-        key="reg_template_box",
-        value=st.session_state["reg_template"],
-        placeholder="Paste here (you can also upload FASTA or fetch by accession above)...",
-    )
+# Keep state synced if user edits
+st.session_state["reg_template"] = template_text
 
-    # keep state synced
-    st.session_state["reg_template"] = template_text
+template_seq = _parse_fasta_text(template_text)
 
-    template_seq = _parse_fasta_text(template_text)
+if len(template_seq) == 0:
+    st.info("Paste a sequence, upload a FASTA file, or fetch an NCBI accession.")
+    add_footer()
+    return
 
-    if len(template_seq) == 0:
-        st.info("Paste a sequence, upload a FASTA file, or fetch an NCBI accession.")
-        add_footer()
-        return
+st.caption(f"Template length used: {len(template_seq)} bp")
+st.markdown("---")
 
-    st.caption(f"Template length used: {len(template_seq)} bp")
-    st.markdown("---")
-
-    run = st.button("Design primers", key="reg_run_btn")
-    if not run:
-        add_footer()
-        return
+run = st.button("Design primers", key="reg_run_btn")
+if not run:
+    add_footer()
+    return
 
     # ============================
     # Run design
