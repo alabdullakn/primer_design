@@ -21,8 +21,6 @@ def render():
     else:
         st.info("Image not found: assets/splicing_examples.png")
 
-    st.markdown("---")
-
     with st.expander("Primer design parameters", expanded=False):
         c1, c2 = st.columns(2)
 
@@ -44,8 +42,6 @@ def render():
             tm_tol = st.number_input(
                 "Tm tolerance (± °C)", 1.0, 20.0, 5.0, key="splicing_tm_tol"
             )
-
-    st.markdown("---")
 
     st.subheader("Choose which primer pairs to generate (max 2)")
 
