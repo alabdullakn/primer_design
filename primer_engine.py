@@ -952,3 +952,203 @@ def design_qpcr_junction_pair(
         )
 
     return best_fwd, best_rev, probe
+
+
+
+# ============================
+# qPCR wrapper + probe (ADD)
+# ============================
+
+def qpcr_amplicon_size_from_hits(fwd: PrimerHit, rev: PrimerHit) -> int:
+    return max(0, (rev.start_0based + rev.length) - fwd.start_0based)
+
+
+def _qpcr_pair_tm_ok(fwd: PrimerHit, rev: PrimerHit, max_tm_diff_pair: float) -> bool:
+    return abs(fwd.tm_c - rev.tm_c) <= max_tm_diff_pair
+
+
+def _score_probe_candidate(seq: str, tm_target: float, tm_tol: float, gc_min: float, gc_max: float, max_homopolymer: int) -> Optional[Tuple[float, float, float]]:
+    # Probe is usually higher Tm than primers
+    tm = tm_wallace(seq)
+    gc = gc_content(seq)
+
+    if abs(tm - tm_target) > tm_tol:
+        return None
+    if not (gc_min <= gc <= gc_max):
+        return None
+    if max_run(seq) > max_homopolymer:
+        return None
+    if self_complementarity_flag(seq):
+        return None
+
+    # Common practical rule: avoid 5' G (quenches some dyes)
+    if seq.startswith("G"):
+        return None
+
+    score = 0.0
+    score += abs(tm - tm_target) * 3.0
+    # mild preference: avoid ending with G (not strict, but helps sometimes)
+    if seq.endswith("G"):
+        score += 1.0
+
+    return score, tm, gc
+
+
+def design_taqman_probe_between(
+    spliced_template_with_marker: str,
+    fwd: PrimerHit,
+    rev: PrimerHit,
+    probe_min_len: int = 18,
+    probe_max_len: int = 30,
+    probe_tm_target: float = 68.0,
+    probe_tm_tol: float = 5.0,
+    probe_gc_min: float = 30.0,
+    probe_gc_max: float = 80.0,
+    max_homopolymer: int = 3
+) -> PrimerHit:
+    # Build spliced template (remove ^)
+    left, right = parse_junction_marked_seq(spliced_template_with_marker, marker="^")
+    template = left + right
+
+    # Define interior region between primers on the template
+    fwd_end = fwd.start_0based + fwd.length
+    rev_start = rev.start_0based
+
+    if rev_start <= fwd_end + probe_min_len:
+        raise RuntimeError("No room to place a probe between primers with your constraints.")
+
+    region = template[fwd_end:rev_start]
+    region_start = fwd_end
+
+    best = None  # (score, PrimerHit)
+
+    for L in range(probe_min_len, probe_max_len + 1):
+        for i in range(0, len(region) - L + 1):
+            pseq = region[i:i + L]
+            scored = _score_probe_candidate(
+                pseq,
+                tm_target=probe_tm_target,
+                tm_tol=probe_tm_tol,
+                gc_min=probe_gc_min,
+                gc_max=probe_gc_max,
+                max_homopolymer=max_homopolymer
+            )
+            if scored is None:
+                continue
+            score, tm, gc = scored
+            hit = PrimerHit(
+                kind="PROBE",
+                exon_name="BetweenPrimers",
+                start_0based=region_start + i,
+                length=L,
+                seq_5to3=pseq,
+                tm_c=tm,
+                gc_pct=gc,
+                score=score
+            )
+            if best is None or score < best[0]:
+                best = (score, hit)
+
+    if best is None:
+        raise RuntimeError("No probe found. Try widening probe Tm tolerance or GC limits.")
+    return best[1]
+
+
+def design_qpcr_junction_pair(
+    seq_with_junction_marker: str,
+    chemistry: str = "SYBR",           # "SYBR" or "TAQMAN"
+    junction_primer: str = "AUTO",     # "AUTO", "FWD", "REV"
+    min_len: int = 18,
+    max_len: int = 25,
+    primer_tm_target: float = 60.0,
+    primer_tm_tol: float = 2.0,
+    primer_gc_min: float = 40.0,
+    primer_gc_max: float = 60.0,
+    max_homopolymer: int = 3,
+    amplicon_min: int = 70,
+    amplicon_max: int = 200,
+    junction_min_overlap_each_side: int = 6,
+    max_tm_diff_pair: float = 1.0,
+    dimer_k: int = 4,
+    # probe defaults
+    probe_min_len: int = 18,
+    probe_max_len: int = 30,
+    probe_tm_target: float = 68.0,
+    probe_tm_tol: float = 5.0,
+    probe_gc_min: float = 30.0,
+    probe_gc_max: float = 80.0,
+) -> Tuple[PrimerHit, PrimerHit, Optional[PrimerHit]]:
+
+    # Temporarily tighten your existing score_candidate by checking GC and homopolymers here
+    def _candidate_ok(seq: str) -> bool:
+        gc = gc_content(seq)
+        if not (primer_gc_min <= gc <= primer_gc_max):
+            return False
+        if max_run(seq) > max_homopolymer:
+            return False
+        if self_complementarity_flag(seq):
+            return False
+        return True
+
+    def _wrap_design(span: str) -> Tuple[PrimerHit, PrimerHit]:
+        fwd, rev = design_qpcr_junction_primers(
+            seq_with_junction_marker=seq_with_junction_marker,
+            span_primer=span,
+            min_len=min_len,
+            max_len=max_len,
+            tm_target=primer_tm_target,
+            tm_tol=primer_tm_tol,
+            amplicon_min=amplicon_min,
+            amplicon_max=amplicon_max,
+            junction_min_overlap_each_side=junction_min_overlap_each_side,
+        )
+
+        # extra strict checks
+        if not _candidate_ok(fwd.seq_5to3):
+            raise RuntimeError("Forward primer failed strict qPCR rules. Try AUTO or adjust settings.")
+        if not _candidate_ok(rev.seq_5to3):
+            raise RuntimeError("Reverse primer failed strict qPCR rules. Try AUTO or adjust settings.")
+        if not _qpcr_pair_tm_ok(fwd, rev, max_tm_diff_pair=max_tm_diff_pair):
+            raise RuntimeError("Primer pair Tm mismatch too large. Try AUTO or relax max Tm diff.")
+        if has_3prime_complementarity(fwd.seq_5to3, rev.seq_5to3, k=dimer_k):
+            raise RuntimeError("3' complementarity detected between primers. Try AUTO or increase constraints.")
+
+        return fwd, rev
+
+    best = None  # (total_score, fwd, rev)
+
+    mode = (junction_primer or "AUTO").upper()
+    if mode in ["FWD", "REV"]:
+        fwd, rev = _wrap_design(mode)
+        best = (fwd.score + rev.score, fwd, rev)
+    else:
+        # AUTO: try both
+        for span in ["FWD", "REV"]:
+            try:
+                fwd, rev = _wrap_design(span)
+                total = fwd.score + rev.score
+                if best is None or total < best[0]:
+                    best = (total, fwd, rev)
+            except Exception:
+                pass
+        if best is None:
+            raise RuntimeError("AUTO failed to find a valid junction pair. Relax constraints slightly.")
+
+    _, fwd_best, rev_best = best
+
+    probe = None
+    if (chemistry or "SYBR").upper() == "TAQMAN":
+        probe = design_taqman_probe_between(
+            spliced_template_with_marker=seq_with_junction_marker,
+            fwd=fwd_best,
+            rev=rev_best,
+            probe_min_len=probe_min_len,
+            probe_max_len=probe_max_len,
+            probe_tm_target=probe_tm_target,
+            probe_tm_tol=probe_tm_tol,
+            probe_gc_min=probe_gc_min,
+            probe_gc_max=probe_gc_max,
+            max_homopolymer=max_homopolymer
+        )
+
+    return fwd_best, rev_best, probe
