@@ -7,6 +7,7 @@ from utils.blast import primer_blast_url_pair, primer_blast_url_single
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from ui.footer import add_footer
 from pathlib import Path
+from primer_engine import design_exon_primers, print_dimer_report
 import streamlit as st
 
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
