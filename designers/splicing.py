@@ -23,35 +23,36 @@ def render():
 
     st.markdown("---")
 
-    # ============================
-    # Step 1: Primer design parameters
-    # ============================
-
     with st.expander("Primer design parameters", expanded=False):
-    c1, c2 = st.columns(2)
+        c1, c2 = st.columns(2)
 
-    with c1:
-        min_len = st.number_input("Min primer length", 16, 40, 18, key="qpcr_min_len")
-        max_len = st.number_input("Max primer length", 16, 60, 25, key="qpcr_max_len")
-        dimer_k = st.number_input("3' dimer check window (k)", 3, 10, 4, key="qpcr_dimer_k")
+        with c1:
+            min_len = st.number_input(
+                "Min primer length", 16, 40, 18, key="splicing_min_len"
+            )
+            max_len = st.number_input(
+                "Max primer length", 16, 60, 25, key="splicing_max_len"
+            )
+            dimer_k = st.number_input(
+                "3' dimer check window (k)", 3, 10, 4, key="splicing_dimer_k"
+            )
 
-    with c2:
-        tm_target = st.number_input("Target Tm (°C)", 45.0, 75.0, 60.0, key="qpcr_tm_target")
-        tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 20.0, 5.0, key="qpcr_tm_tol")
+        with c2:
+            tm_target = st.number_input(
+                "Target Tm (°C)", 45.0, 75.0, 60.0, key="splicing_tm_target"
+            )
+            tm_tol = st.number_input(
+                "Tm tolerance (± °C)", 1.0, 20.0, 5.0, key="splicing_tm_tol"
+            )
+
     st.markdown("---")
-
-    # ============================
-    # Step 2: Pair selection (max 2)
-    # ============================
 
     st.subheader("Choose which primer pairs to generate (max 2)")
 
     colA, colB = st.columns(2)
-
     with colA:
         pair_aa = st.checkbox("FWD A + REV A", value=True, key="splicing_pair_aa")
         pair_ab = st.checkbox("FWD A + REV B", key="splicing_pair_ab")
-
     with colB:
         pair_ba = st.checkbox("FWD B + REV A", key="splicing_pair_ba")
 
@@ -85,13 +86,10 @@ def render():
 
     if needs_fwd_a:
         exon_fwd_a = st.text_area("Forward A sequence", height=140, key="splicing_fwd_a")
-
     if needs_fwd_b:
         exon_fwd_b = st.text_area("Forward B sequence", height=140, key="splicing_fwd_b")
-
     if needs_rev_a:
         exon_rev_a = st.text_area("Reverse A sequence", height=140, key="splicing_rev_a")
-
     if needs_rev_b:
         exon_rev_b = st.text_area("Reverse B sequence", height=140, key="splicing_rev_b")
 
@@ -115,10 +113,6 @@ def render():
     if not run:
         add_footer()
         return
-
-    # ============================
-    # Run design only when clicked
-    # ============================
 
     try:
         exon1_safe = exon_fwd_a.strip() if exon_fwd_a.strip() else exon_fwd_b.strip()
@@ -183,7 +177,9 @@ def render():
                     "Score": round(rev_obj.score, 2),
                 }
             )
-            blast_links.append((pair_name, primer_blast_url_pair(fwd_obj.seq_5to3, rev_obj.seq_5to3, org)))
+            blast_links.append(
+                (pair_name, primer_blast_url_pair(fwd_obj.seq_5to3, rev_obj.seq_5to3, org))
+            )
 
         for p in selected_pairs:
             if p == "FWD A + REV A" and res_A is not None:
