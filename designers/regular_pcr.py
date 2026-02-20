@@ -44,6 +44,17 @@ def _fetch_ncbi_fasta(accession: str) -> str:
 # Simple regular PCR designer
 # ----------------------------
 
+def _max_run(seq: str) -> int:
+    best = cur = 1
+    for i in range(1, len(seq)):
+        if seq[i] == seq[i - 1]:
+            cur += 1
+            best = max(best, cur)
+        else:
+            cur = 1
+    return best
+
+
 def _is_valid_primer(seq: str, tm_target: float, tm_tol: float) -> bool:
     if not seq:
         return False
@@ -53,16 +64,7 @@ def _is_valid_primer(seq: str, tm_target: float, tm_tol: float) -> bool:
     gc = gc_pct(seq)
     if gc < 35 or gc > 65:
         return False
-    # avoid long homopolymers
-    run = 1
-    best = 1
-    for i in range(1, len(seq)):
-        if seq[i] == seq[i - 1]:
-            run += 1
-            best = max(best, run)
-        else:
-            run = 1
-    if best >= 5:
+    if _max_run(seq) >= 5:
         return False
     return True
 
@@ -80,55 +82,43 @@ def design_basic_pcr_primers(
 ):
     """
     Returns: (fwd_5to3, rev_5to3, amplicon_len)
-    Simple heuristic:
-      - pick FWD from first start_window
-      - pick REV from last end_window
-      - enforce amplicon length between min/max
+    Heuristic:
+      - choose FWD from first start_window
+      - choose REV from last end_window
+      - enforce amplicon size between min/max
     """
-
     seq = _parse_fasta_text(template)
     if len(seq) < (min_len + min_len + amplicon_min):
         raise Exception("Template too short for your constraints.")
 
     left = seq[: min(len(seq), start_window)]
     right = seq[max(0, len(seq) - end_window) :]
+    right_start = len(seq) - len(right)
 
     best = None  # (score, fwd, rev, amp_len)
 
-    # enumerate fwd candidates
     for Lf in range(min_len, max_len + 1):
         for i in range(0, len(left) - Lf + 1):
             fwd = left[i : i + Lf]
             if not _is_valid_primer(fwd, tm_target, tm_tol):
                 continue
-
             fwd_tm = tm_wallace(fwd)
-
-            # enumerate reverse binding sites on the template (near end)
-            # right region corresponds to positions [len(seq)-len(right) .. len(seq)-1]
-            right_start = len(seq) - len(right)
 
             for Lr in range(min_len, max_len + 1):
                 for j in range(0, len(right) - Lr + 1):
-                    bind_site = right[j : j + Lr]         # template 5'->3'
-                    rev = revcomp(bind_site)              # primer 5'->3' to order
+                    bind_site = right[j : j + Lr]
+                    rev = revcomp(bind_site)
                     if not _is_valid_primer(rev, tm_target, tm_tol):
                         continue
-
                     rev_tm = tm_wallace(rev)
 
-                    # compute amplicon length (approx)
-                    fwd_start = i
-                    rev_bind_start = right_start + j
-                    amp_len = (rev_bind_start + Lr) - fwd_start
-
+                    amp_len = (right_start + j + Lr) - i
                     if amp_len < amplicon_min or amp_len > amplicon_max:
                         continue
 
-                    # score: close Tm match and shorter amplicon preference
                     score = abs(fwd_tm - tm_target) + abs(rev_tm - tm_target)
-                    score += abs((fwd_tm - rev_tm)) * 0.5
-                    score += (amp_len / 1000.0)  # tiny penalty for longer products
+                    score += abs(fwd_tm - rev_tm) * 0.5
+                    score += (amp_len / 1000.0)
 
                     if best is None or score < best[0]:
                         best = (score, fwd, rev, amp_len)
@@ -140,8 +130,7 @@ def design_basic_pcr_primers(
     return fwd, rev, amp_len
 
 
-def _simple_dimer_note(fwd: str, rev: str) -> str:
-    # very light warning: 3' complementarity of last 4 bases
+def _quick_dimer_note(fwd: str, rev: str) -> str:
     k = 4
     if len(fwd) >= k and revcomp(fwd[-k:]) in rev:
         return "Warning: possible 3' complementarity (k=4)."
@@ -156,7 +145,13 @@ def _simple_dimer_note(fwd: str, rev: str) -> str:
 
 def render():
     st.title("Regular PCR")
-    st.write("Paste a template, upload FASTA, or fetch by NCBI accession, then design one primer pair.")
+    st.write("Design one forward and one reverse primer from a single template sequence.")
+
+    # Session state
+    if "reg_seq" not in st.session_state:
+        st.session_state["reg_seq"] = ""
+    if "reg_status" not in st.session_state:
+        st.session_state["reg_status"] = ""
 
     # Params
     with st.expander("Primer design parameters", expanded=False):
@@ -172,12 +167,6 @@ def render():
 
     st.markdown("---")
 
-    # Session state
-    if "reg_template" not in st.session_state:
-        st.session_state["reg_template"] = ""
-    if "reg_msg" not in st.session_state:
-        st.session_state["reg_msg"] = ""
-
     st.subheader("Sequence input")
 
     mode = st.radio(
@@ -187,48 +176,56 @@ def render():
         key="reg_input_mode",
     )
 
-    if mode == "Upload FASTA":
-        file = st.file_uploader("Upload FASTA file", type=["fa", "fasta", "txt"], key="reg_fasta")
+    if mode == "Paste sequence":
+        raw = st.text_area(
+            "Paste template sequence (A/C/G/T only)",
+            height=220,
+            key="reg_paste_box",
+            placeholder="Paste sequence here...",
+        )
+        seq = _parse_fasta_text(">x\n" + raw)
+        if seq:
+            st.session_state["reg_seq"] = seq
+            st.session_state["reg_status"] = f"Using pasted sequence | length: {len(seq)}"
+
+    elif mode == "Upload FASTA":
+        file = st.file_uploader("Upload FASTA file", type=["fa", "fasta", "txt"], key="reg_fasta_file")
         if file is not None:
             content = file.read().decode("utf-8", errors="ignore")
             seq = _parse_fasta_text(content)
-            st.session_state["reg_template"] = seq
-            st.session_state["reg_msg"] = f"Loaded FASTA | length: {len(seq)}"
+            if seq:
+                st.session_state["reg_seq"] = seq
+                st.session_state["reg_status"] = f"Loaded FASTA | length: {len(seq)}"
 
-    if mode == "NCBI accession":
+    else:  # NCBI accession
         acc = st.text_input("Enter NCBI accession", key="reg_ncbi_acc")
         if st.button("Fetch from NCBI", key="reg_fetch_btn"):
             try:
                 fasta = _fetch_ncbi_fasta(acc)
                 seq = _parse_fasta_text(fasta)
-                st.session_state["reg_template"] = seq
-                st.session_state["reg_msg"] = f"Fetched {acc} | length: {len(seq)}"
+                if not seq:
+                    raise Exception("NCBI returned empty sequence.")
+                st.session_state["reg_seq"] = seq
+                st.session_state["reg_status"] = f"Fetched {acc} | length: {len(seq)}"
                 st.rerun()
             except Exception as e:
-                st.session_state["reg_msg"] = ""
+                st.session_state["reg_status"] = ""
                 st.error(str(e))
 
-    if st.session_state["reg_msg"]:
-        st.success(st.session_state["reg_msg"])
+        # No big template box here
+        if st.session_state["reg_seq"]:
+            with st.expander("Preview fetched sequence", expanded=False):
+                st.text_area("Fetched sequence (read-only)", st.session_state["reg_seq"], height=180, disabled=True)
 
-    template_text = st.text_area(
-        "Template sequence (FASTA or raw). We will keep A/C/G/T only.",
-        height=240,
-        value=st.session_state["reg_template"],
-        key="reg_template_box",
-        placeholder="Paste here (or upload FASTA, or fetch by accession above)...",
-    )
+    if st.session_state["reg_status"]:
+        st.success(st.session_state["reg_status"])
 
-    st.session_state["reg_template"] = template_text
-    template_seq = _parse_fasta_text(template_text)
-
-    if len(template_seq) == 0:
+    seq_used = _parse_fasta_text(st.session_state["reg_seq"])
+    if not seq_used:
         st.info("Paste a sequence, upload a FASTA file, or fetch an NCBI accession.")
         add_footer()
         return
-
-    st.caption(f"Template length used: {len(template_seq)} bp")
-    st.markdown("---")
+st.markdown("---")
 
     run = st.button("Design primers", key="reg_run_btn")
     if not run:
@@ -237,7 +234,7 @@ def render():
 
     try:
         fwd, rev, amp_len = design_basic_pcr_primers(
-            template_seq,
+            seq_used,
             min_len=int(min_len),
             max_len=int(max_len),
             tm_target=float(tm_target),
@@ -263,14 +260,14 @@ def render():
             {
                 "Type": "REV",
                 "Primer (5'→3')": rev,
-                "Length": len(rev),
+        "Length": len(rev),
                 "Tm (°C)": round(tm_wallace(rev), 1),
                 "GC (%)": round(gc_pct(rev), 1),
                 "Score": round(primer_score(rev, tm_target), 2),
             },
         ]
-
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
         st.write(f"Estimated amplicon length: **{amp_len} bp**")
 
         st.subheader("Primer-BLAST link (pair)")
@@ -279,7 +276,7 @@ def render():
         st.info(BLAST_INSTRUCTIONS)
 
         st.subheader("Quick dimer screen")
-        st.info(_simple_dimer_note(fwd, rev))
+        st.info(_quick_dimer_note(fwd, rev))
 
         add_footer()
 
