@@ -19,7 +19,6 @@ def render():
 
     st.subheader("Examples")
     st.image(str(SPLICING_IMG), use_container_width=True)
-    # st.image(...)  # you already added this in step 1
 
     st.markdown("---")
 
@@ -29,23 +28,32 @@ def render():
 
     st.subheader("Choose which primer pairs to generate (max 3)")
 
-    pair_options = [
-        "FWD A + REV A",
-        "FWD A + REV B",
-        "FWD B + REV A",
-        "FWD B + REV B",
-    ]
+    c1, c2 = st.columns(2)
 
-    selected_pairs = st.multiselect(
-        "Select up to 3 primer pairs",
-        options=pair_options,
-        default=["FWD A + REV A"],
-        max_selections=3,
-        key="splicing_pair_select",
-    )
+    with c1:
+        pair_aa = st.checkbox("FWD A + REV A", value=True, key="splicing_pair_aa")
+        pair_ab = st.checkbox("FWD A + REV B", value=False, key="splicing_pair_ab")
+
+    with c2:
+        pair_ba = st.checkbox("FWD B + REV A", value=False, key="splicing_pair_ba")
+        pair_bb = st.checkbox("FWD B + REV B", value=False, key="splicing_pair_bb")
+
+    selected_pairs = []
+    if pair_aa:
+        selected_pairs.append("FWD A + REV A")
+    if pair_ab:
+        selected_pairs.append("FWD A + REV B")
+    if pair_ba:
+        selected_pairs.append("FWD B + REV A")
+    if pair_bb:
+        selected_pairs.append("FWD B + REV B")
 
     if len(selected_pairs) == 0:
         st.error("Please select at least one primer pair.")
+        st.stop()
+
+    if len(selected_pairs) > 3:
+        st.error("Maximum 3 primer pairs allowed.")
         st.stop()
 
     # Decide which sequences we need based on what the user selected
@@ -111,7 +119,3 @@ def render():
 
     st.markdown("---")
     st.button("Design primers", key="splicing_design_btn")
-
-    # Step 3 will connect this button to primer_engine and show outputs
-    # UI + logic here
-
