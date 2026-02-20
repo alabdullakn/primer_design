@@ -48,7 +48,7 @@ def render():
     st.title("Regular PCR")
     st.write("Design a standard forward and reverse primer pair from a single template sequence.")
 
-    st.markdown("---")
+
 
     # ============================
     # Primer parameters
