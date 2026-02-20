@@ -21,22 +21,29 @@ def render():
     st.image(str(SPLICING_IMG), use_container_width=True)
 
     st.markdown("---")
+def render():
+    st.title("Splicing primers")
+    st.write("Design primers for exon skipping, intron retention, or alternative splicing.")
+
+    st.subheader("Examples")
+    st.image(str(SPLICING_IMG), use_container_width=True)
+
+    st.markdown("---")
 
     # ============================
-    # Step 2: Pair selection (max 3)
+    # Step 2: Pair selection (max 2)
     # ============================
 
-    st.subheader("Choose which primer pairs to generate (max 3)")
+    st.subheader("Choose which primer pairs to generate (max 2)")
 
     c1, c2 = st.columns(2)
 
     with c1:
         pair_aa = st.checkbox("FWD A + REV A", value=True, key="splicing_pair_aa")
-        pair_ab = st.checkbox("FWD A + REV B", value=False, key="splicing_pair_ab")
+        pair_ab = st.checkbox("FWD A + REV B", key="splicing_pair_ab")
 
     with c2:
-        pair_ba = st.checkbox("FWD B + REV A", value=False, key="splicing_pair_ba")
-        pair_bb = st.checkbox("FWD B + REV B", value=False, key="splicing_pair_bb")
+        pair_ba = st.checkbox("FWD B + REV A", key="splicing_pair_ba")
 
     selected_pairs = []
     if pair_aa:
@@ -45,18 +52,19 @@ def render():
         selected_pairs.append("FWD A + REV B")
     if pair_ba:
         selected_pairs.append("FWD B + REV A")
-    if pair_bb:
-        selected_pairs.append("FWD B + REV B")
 
     if len(selected_pairs) == 0:
         st.error("Please select at least one primer pair.")
         st.stop()
 
-    if len(selected_pairs) > 3:
-        st.error("Maximum 3 primer pairs allowed.")
+    if len(selected_pairs) > 2:
+        st.error("Maximum 2 primer pairs allowed.")
         st.stop()
 
-    # Decide which sequences we need based on what the user selected
+    # ============================
+    # Determine required sequences
+    # ============================
+
     needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
     needs_fwd_b = any(p.startswith("FWD B") for p in selected_pairs)
     needs_rev_a = any(p.endswith("REV A") for p in selected_pairs)
@@ -69,13 +77,11 @@ def render():
     exon_rev_a = ""
     exon_rev_b = ""
 
-    # Show only the boxes that are needed
     if needs_fwd_a:
         exon_fwd_a = st.text_area(
             "Forward A sequence",
             height=140,
             key="splicing_fwd_a",
-            placeholder="Paste exon sequence for Forward A...",
         )
 
     if needs_fwd_b:
@@ -83,7 +89,6 @@ def render():
             "Forward B sequence",
             height=140,
             key="splicing_fwd_b",
-            placeholder="Paste exon sequence for Forward B...",
         )
 
     if needs_rev_a:
@@ -91,7 +96,6 @@ def render():
             "Reverse A sequence",
             height=140,
             key="splicing_rev_a",
-            placeholder="Paste exon sequence for Reverse A...",
         )
 
     if needs_rev_b:
@@ -99,10 +103,12 @@ def render():
             "Reverse B sequence",
             height=140,
             key="splicing_rev_b",
-            placeholder="Paste exon sequence for Reverse B...",
         )
 
-    # Validate only what was required
+    # ============================
+    # Validation
+    # ============================
+
     missing = []
     if needs_fwd_a and not exon_fwd_a.strip():
         missing.append("Forward A")
