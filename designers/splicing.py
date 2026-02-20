@@ -27,17 +27,17 @@ def render():
     # Step 1: Primer design parameters
     # ============================
 
-    st.subheader("Primer design parameters")
-
+    with st.expander("Primer design parameters", expanded=False):
     c1, c2 = st.columns(2)
-    with c1:
-        min_len = st.number_input("Min primer length", 16, 30, 18, key="splicing_min_len")
-        max_len = st.number_input("Max primer length", 16, 40, 25, key="splicing_max_len")
-        dimer_k = st.number_input("3' dimer check window (k)", 3, 8, 4, key="splicing_dimer_k")
-    with c2:
-        tm_target = st.number_input("Target Tm (°C)", 50.0, 75.0, 60.0, key="splicing_tm_target")
-        tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 15.0, 5.0, key="splicing_tm_tol")
 
+    with c1:
+        min_len = st.number_input("Min primer length", 16, 40, 18, key="qpcr_min_len")
+        max_len = st.number_input("Max primer length", 16, 60, 25, key="qpcr_max_len")
+        dimer_k = st.number_input("3' dimer check window (k)", 3, 10, 4, key="qpcr_dimer_k")
+
+    with c2:
+        tm_target = st.number_input("Target Tm (°C)", 45.0, 75.0, 60.0, key="qpcr_tm_target")
+        tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 20.0, 5.0, key="qpcr_tm_tol")
     st.markdown("---")
 
     # ============================
