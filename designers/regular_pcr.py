@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 
+from primer_engine import design_basic_pcr_primers, print_dimer_report
 from utils.blast import primer_blast_url_pair
 from utils.primer_utils import gc_pct, tm_wallace, primer_score
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
@@ -30,11 +31,9 @@ def _fetch_ncbi(accession: str) -> str:
     acc = accession.strip()
     if not acc:
         return ""
-    url = (
-        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-        f"?db=nuccore&id={acc}&rettype=fasta&retmode=text"
-    )
-    r = requests.get(url, timeout=20)
+    url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+    params = {"db": "nuccore", "id": acc, "rettype": "fasta", "retmode": "text"}
+    r = requests.get(url, params=params, timeout=20)
     if r.status_code != 200:
         raise Exception("Failed to fetch accession from NCBI.")
     return r.text
@@ -48,7 +47,9 @@ def render():
     st.title("Regular PCR")
     st.write("Design a standard forward and reverse primer pair from a single template sequence.")
 
-
+    # Session state to persist template across reruns
+    if "reg_sequence" not in st.session_state:
+        st.session_state["reg_sequence"] = ""
 
     # ============================
     # Primer parameters
@@ -70,7 +71,7 @@ def render():
     st.markdown("---")
 
     # ============================
-    # Sequence input method
+    # Input
     # ============================
 
     st.subheader("Sequence input")
@@ -82,33 +83,49 @@ def render():
         key="reg_input_mode",
     )
 
-    sequence = ""
-
     if mode == "Paste sequence":
-        text = st.text_area(
+        pasted = st.text_area(
             "Paste template sequence (A/C/G/T only)",
             height=180,
             key="reg_seq_paste",
         )
-        sequence = _parse_fasta_text(">x\n" + text)
+        if pasted.strip():
+            st.session_state["reg_sequence"] = _parse_fasta_text(">x\n" + pasted)
 
     elif mode == "Upload FASTA":
         file = st.file_uploader("Upload FASTA file", type=["fa", "fasta", "txt"], key="reg_fasta")
         if file:
             content = file.read().decode("utf-8", errors="ignore")
-            sequence = _parse_fasta_text(content)
-            st.success(f"Loaded sequence length: {len(sequence)}")
+            seq = _parse_fasta_text(content)
+            if not seq:
+                st.error("Could not parse FASTA.")
+            else:
+                st.session_state["reg_sequence"] = seq
+                st.success(f"Loaded sequence length: {len(seq)}")
 
     elif mode == "NCBI accession":
         acc = st.text_input("Enter NCBI accession", key="reg_ncbi")
         if st.button("Fetch from NCBI", key="reg_fetch"):
             try:
                 fasta = _fetch_ncbi(acc)
-                sequence = _parse_fasta_text(fasta)
-                st.success(f"Fetched {acc} | length: {len(sequence)}")
+                seq = _parse_fasta_text(fasta)
+                if not seq:
+                    st.error("No sequence returned. Check the accession.")
+                else:
+                    st.session_state["reg_sequence"] = seq
+                    st.success(f"Fetched {acc} | length: {len(seq)}")
             except Exception as e:
                 st.error(str(e))
 
+    # Always show what the app will actually design on
+    st.markdown("**Template used for design:**")
+    st.text_area(
+        "Template (auto-filled after upload/fetch, you can also edit here)",
+        height=140,
+        key="reg_sequence",
+    )
+
+    sequence = (st.session_state.get("reg_sequence") or "").strip()
     if not sequence:
         add_footer()
         return
@@ -160,7 +177,6 @@ def render():
         ]
 
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
-
         st.write(f"Estimated amplicon length: **{amp_len} bp**")
 
         st.subheader("Primer-BLAST link")
@@ -168,7 +184,9 @@ def render():
         st.markdown(f"[Open in Primer-BLAST]({url})")
         st.info(BLAST_INSTRUCTIONS)
 
-        st.subheader("Heterodimer check")
+        st.subheader("Dimer check")
+        # This matches your splicing usage pattern: (fwdA, fwdB, rev)
+        # For regular PCR we pass (fwd, fwd, rev) to get fwd and fwd-rev checks.
         print_dimer_report(fwd, fwd, rev)
 
         add_footer()
