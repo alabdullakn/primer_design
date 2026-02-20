@@ -8,10 +8,6 @@ from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from ui.footer import add_footer
 
 
-# ----------------------------
-# FASTA + NCBI helpers
-# ----------------------------
-
 def _parse_fasta_text(text: str) -> str:
     if not text:
         return ""
@@ -38,22 +34,17 @@ def _fetch_ncbi(accession: str) -> str:
     return r.text
 
 
-# ----------------------------
-# Main Render
-# ----------------------------
-
 def render():
     st.title("Regular PCR")
     st.write("Design a standard forward and reverse primer pair from a single template sequence.")
 
-    # Session state to persist template across reruns
+    # Persist template across reruns (needed for upload/fetch)
     if "reg_sequence" not in st.session_state:
         st.session_state["reg_sequence"] = ""
 
     # ============================
     # Primer parameters
     # ============================
-
     with st.expander("Primer design parameters", expanded=False):
         c1, c2 = st.columns(2)
 
@@ -70,9 +61,8 @@ def render():
     st.markdown("---")
 
     # ============================
-    # Input
+    # Sequence input
     # ============================
-
     st.subheader("Sequence input")
 
     mode = st.radio(
@@ -88,8 +78,8 @@ def render():
             height=180,
             key="reg_seq_paste",
         )
-        if pasted.strip():
-            st.session_state["reg_sequence"] = _parse_fasta_text(">x\n" + pasted)
+        seq = _parse_fasta_text(">x\n" + pasted) if pasted.strip() else ""
+        sequence = seq
 
     elif mode == "Upload FASTA":
         file = st.file_uploader("Upload FASTA file", type=["fa", "fasta", "txt"], key="reg_fasta")
@@ -102,7 +92,15 @@ def render():
                 st.session_state["reg_sequence"] = seq
                 st.success(f"Loaded sequence length: {len(seq)}")
 
-    elif mode == "NCBI accession":
+        st.markdown("**Template used for design**")
+        st.text_area(
+            "Template",
+            height=140,
+            key="reg_sequence",
+        )
+        sequence = (st.session_state.get("reg_sequence") or "").strip()
+
+    else:  # NCBI accession
         acc = st.text_input("Enter NCBI accession", key="reg_ncbi")
         if st.button("Fetch from NCBI", key="reg_fetch"):
             try:
@@ -116,15 +114,14 @@ def render():
             except Exception as e:
                 st.error(str(e))
 
-    # Always show what the app will actually design on
-    st.markdown("**Template used for design:**")
-    st.text_area(
-        "Template (auto-filled after upload/fetch, you can also edit here)",
-        height=140,
-        key="reg_sequence",
-    )
+        st.markdown("**Template used for design**")
+        st.text_area(
+            "Template",
+            height=140,
+            key="reg_sequence",
+        )
+        sequence = (st.session_state.get("reg_sequence") or "").strip()
 
-    sequence = (st.session_state.get("reg_sequence") or "").strip()
     if not sequence:
         add_footer()
         return
@@ -139,7 +136,6 @@ def render():
     # ============================
     # Run design
     # ============================
-
     try:
         fwd, rev, amp_len, _, _ = design_basic_pcr_primers(
             sequence,
@@ -183,9 +179,7 @@ def render():
         st.markdown(f"[Open in Primer-BLAST]({url})")
         st.info(BLAST_INSTRUCTIONS)
 
-        st.subheader("Dimer check")
-        # This matches your splicing usage pattern: (fwdA, fwdB, rev)
-        # For regular PCR we pass (fwd, fwd, rev) to get fwd and fwd-rev checks.
+        st.subheader("Heterodimer check")
         print_dimer_report(fwd, fwd, rev)
 
         add_footer()
