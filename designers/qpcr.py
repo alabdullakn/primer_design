@@ -1,300 +1,177 @@
 import streamlit as st
 import pandas as pd
-import requests
 
 from primer_engine import (
-    design_qpcr_junction_primers,
-    design_qpcr_basic_primers,
-    qpcr_amplicon_size,
+    design_qpcr_junction_pair,
+    qpcr_amplicon_size_from_hits,
     print_dimer_report_pair,
 )
 from utils.blast import primer_blast_url_pair
-from utils.primer_utils import gc_pct, tm_wallace, primer_score
-from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
+from ui.text import BLAST_INSTRUCTIONS
 from ui.footer import add_footer
 
 
-def _parse_fasta_text(text: str) -> str:
-    if not text:
-        return ""
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    seq = []
-    for l in lines:
-        if l.startswith(">"):
-            continue
-        seq.append(l)
-    raw = "".join(seq).upper()
-    allowed = set("ACGT")
-    return "".join([c for c in raw if c in allowed])
-
-
-def _fetch_ncbi_fasta(accession: str) -> str:
-    acc = (accession or "").strip()
-    if not acc:
-        return ""
-    url = (
-        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-        f"?db=nuccore&id={acc}&rettype=fasta&retmode=text"
-    )
-    r = requests.get(url, timeout=25)
-    if r.status_code != 200:
-        raise Exception("Failed to fetch accession from NCBI.")
-    return r.text
-
-
 def render():
-    st.title("qPCR")
-    st.write("Design primers for SYBR qPCR (short amplicon).")
+    st.title("qPCR primers")
+    st.write("Design qPCR primer pairs for cDNA. Supports SYBR Green and TaqMan (hydrolysis probe).")
 
-    if "qpcr_template_seq" not in st.session_state:
-        st.session_state["qpcr_template_seq"] = ""
-    if "qpcr_junction_seq" not in st.session_state:
-        st.session_state["qpcr_junction_seq"] = ""
+    # ============================
+    # Chemistry choice
+    # ============================
 
-    # -------------------------
-    # Mode
-    # -------------------------
-    qpcr_mode = st.radio(
-        "qPCR mode",
-        ["Junction (cDNA, use ^)", "Basic (within exon)"],
-        horizontal=True,
-        key="qpcr_mode",
+    chemistry = st.selectbox(
+        "Detection chemistry",
+        ["SYBR Green", "TaqMan (hydrolysis probe)"],
+        key="qpcr_chemistry",
     )
-
-    # -------------------------
-    # Parameters
-    # -------------------------
-    with st.expander("Primer design parameters", expanded=False):
-        c1, c2 = st.columns(2)
-
-        with c1:
-            min_len = st.number_input("Min primer length", 16, 60, 18, key="qp_min_len")
-            max_len = st.number_input("Max primer length", 16, 80, 25, key="qp_max_len")
-            tm_target = st.number_input("Target Tm (°C)", 45.0, 75.0, 60.0, key="qp_tm_target")
-
-        with c2:
-            tm_tol = st.number_input("Tm tolerance (± °C)", 1.0, 25.0, 5.0, key="qp_tm_tol")
-            amp_min = st.number_input("Amplicon min (bp)", 50, 500, 70, key="qp_amp_min")
-            amp_max = st.number_input("Amplicon max (bp)", 60, 800, 200, key="qp_amp_max")
-
-        dimer_k = st.number_input("3' dimer check window (k)", 3, 8, 4, key="qp_dimer_k")
-
-        if qpcr_mode == "Junction (cDNA, use ^)":
-            st.caption("Put a ^ exactly at the exon exon junction. Example: ...CAGT^GTTAC...")
-            span_primer = st.selectbox(
-                "Which primer spans the junction?",
-                ["FWD", "REV"],
-                index=0,
-                key="qp_span_primer",
-            )
-            overlap = st.number_input(
-                "Min overlap on each side of junction (bp)",
-                4, 10, 6,
-                key="qp_overlap",
-            )
-        else:
-            st.caption("Basic qPCR uses a single template region (no ^).")
-            c3, c4 = st.columns(2)
-            with c3:
-                start_window = st.slider(
-                    "Forward search window (bp from 5')",
-                    min_value=50, max_value=20000, value=1000, step=50,
-                    key="qp_start_window",
-                )
-            with c4:
-                end_window = st.slider(
-                    "Reverse search window (bp from 3')",
-                    min_value=50, max_value=20000, value=1000, step=50,
-                    key="qp_end_window",
-                )
+    chem_key = "SYBR" if chemistry.startswith("SYBR") else "TAQMAN"
 
     st.markdown("---")
 
-    # -------------------------
+    # ============================
+    # Parameters
+    # ============================
+
+    with st.expander("qPCR design parameters", expanded=False):
+        c1, c2 = st.columns(2)
+
+        with c1:
+            min_len = st.number_input("Min primer length", 16, 30, 18, key="qpcr_min_len")
+            max_len = st.number_input("Max primer length", 16, 40, 24, key="qpcr_max_len")
+            primer_tm_target = st.number_input("Primer target Tm (°C)", 50.0, 70.0, 60.0, key="qpcr_tm_target")
+            primer_tm_tol = st.number_input("Primer Tm tolerance (± °C)", 0.5, 10.0, 2.0, key="qpcr_tm_tol")
+
+        with c2:
+            amplicon_min = st.number_input("Amplicon min (bp)", 50, 400, 70, key="qpcr_amp_min")
+            amplicon_max = st.number_input("Amplicon max (bp)", 60, 600, 200, key="qpcr_amp_max")
+            max_tm_diff_pair = st.number_input("Max Tm difference between primers (°C)", 0.5, 5.0, 1.0, key="qpcr_tm_diff")
+            dimer_k = st.number_input("3' dimer screen window (k)", 3, 10, 4, key="qpcr_dimer_k")
+
+        st.caption("Typical qPCR: 70–200 bp amplicon, 18–24 nt primers, primer Tm around 60°C, primer Tm difference ≤ 1°C.")
+
+        strict = st.checkbox("Strict mode (recommended)", value=True, key="qpcr_strict")
+        if strict:
+            primer_gc_min = 40.0
+            primer_gc_max = 60.0
+            max_homopolymer = 3
+        else:
+            primer_gc_min = 35.0
+            primer_gc_max = 65.0
+            max_homopolymer = 4
+
+        junction_min_overlap = st.slider(
+            "Minimum bases on each side of junction for junction primer",
+            min_value=4,
+            max_value=10,
+            value=6,
+            key="qpcr_overlap",
+        )
+
+        junction_primer = st.selectbox(
+            "Which primer spans the junction",
+            ["AUTO (try both)", "FWD spans junction", "REV spans junction"],
+            key="qpcr_junction_choice",
+        )
+        if junction_primer.startswith("AUTO"):
+            junction_key = "AUTO"
+        elif junction_primer.startswith("FWD"):
+            junction_key = "FWD"
+        else:
+            junction_key = "REV"
+
+    st.markdown("---")
+
+    # ============================
     # Input
-    # -------------------------
-    st.subheader("Sequence input")
+    # ============================
 
-    if qpcr_mode == "Junction (cDNA, use ^)":
-        seq = st.text_area(
-            "Paste sequence with ^ at junction (A/C/G/T plus ^)",
-            height=220,
-            key="qpcr_junction_text",
-        )
-        if seq:
-            st.session_state["qpcr_junction_seq"] = seq
+    st.subheader("Template input (cDNA junction marked)")
+    st.write("Paste sequence with '^' marking the exon-exon junction. Example: `...ACCTG^GTTCA...`")
+    seq_with_marker = st.text_area(
+        "Junction-marked sequence",
+        height=200,
+        key="qpcr_seq_marker",
+        placeholder="Paste here with ^ at the junction",
+    )
 
-        if not st.session_state["qpcr_junction_seq"]:
-            st.info("Paste a junction sequence containing ^.")
-            add_footer()
-            return
+    st.markdown("---")
 
-        run = st.button("Design qPCR primers", key="qpcr_run_junc")
-        if not run:
-            add_footer()
-            return
+    run = st.button("Design qPCR primers", key="qpcr_run")
+    if not run:
+        add_footer()
+        return
 
-        try:
-            fwd_hit, rev_hit = design_qpcr_junction_primers(
-                st.session_state["qpcr_junction_seq"],
-                span_primer=st.session_state.get("qp_span_primer", "FWD"),
-                min_len=int(min_len),
-                max_len=int(max_len),
-                tm_target=float(tm_target),
-                tm_tol=float(tm_tol),
-                amplicon_min=int(amp_min),
-                amplicon_max=int(amp_max),
-                junction_min_overlap_each_side=int(overlap),
-            )
-
-            amp_len = qpcr_amplicon_size(st.session_state["qpcr_junction_seq"], fwd_hit, rev_hit)
-
-            st.success("qPCR junction primers designed successfully.")
-            st.caption(SCORE_EXPLANATION)
-
-            rows = [
-                {
-                    "Type": "FWD",
-                    "Primer (5'→3')": fwd_hit.seq_5to3,
-                    "Length": fwd_hit.length,
-                    "Tm (°C)": round(tm_wallace(fwd_hit.seq_5to3), 1),
-                    "GC (%)": round(gc_pct(fwd_hit.seq_5to3), 1),
-                    "Score": round(primer_score(fwd_hit.seq_5to3, float(tm_target)), 2),
-                },
-                {
-                    "Type": "REV",
-                    "Primer (5'→3')": rev_hit.seq_5to3,
-                    "Length": rev_hit.length,
-                    "Tm (°C)": round(tm_wallace(rev_hit.seq_5to3), 1),
-                    "GC (%)": round(gc_pct(rev_hit.seq_5to3), 1),
-                    "Score": round(primer_score(rev_hit.seq_5to3, float(tm_target)), 2),
-                },
-            ]
-            st.dataframe(pd.DataFrame(rows), use_container_width=True)
-            st.write(f"Estimated qPCR amplicon length (spliced template): **{amp_len} bp**")
-
-            st.subheader("Primer-BLAST link (NCBI)")
-            url = primer_blast_url_pair(fwd_hit.seq_5to3, rev_hit.seq_5to3, "Homo sapiens")
-            st.markdown(f"[Open in Primer-BLAST]({url})")
-            st.info(BLAST_INSTRUCTIONS)
-
-            st.subheader("Dimer check")
-            print_dimer_report_pair(fwd_hit.seq_5to3, rev_hit.seq_5to3)
-
-            add_footer()
-
-        except Exception as e:
-            st.error(str(e))
-            add_footer()
-
-    else:
-        # Basic mode supports paste, FASTA, or NCBI accession like regular PCR
-        mode = st.radio(
-            "Choose input type",
-            ["Paste sequence", "Upload FASTA", "NCBI accession"],
-            horizontal=True,
-            key="qpcr_input_mode",
+    try:
+        fwd, rev, probe = design_qpcr_junction_pair(
+            seq_with_junction_marker=seq_with_marker,
+            chemistry=chem_key,
+            junction_primer=junction_key,
+            min_len=int(min_len),
+            max_len=int(max_len),
+            primer_tm_target=float(primer_tm_target),
+            primer_tm_tol=float(primer_tm_tol),
+            primer_gc_min=float(primer_gc_min),
+            primer_gc_max=float(primer_gc_max),
+            max_homopolymer=int(max_homopolymer),
+            amplicon_min=int(amplicon_min),
+            amplicon_max=int(amplicon_max),
+            junction_min_overlap_each_side=int(junction_min_overlap),
+            max_tm_diff_pair=float(max_tm_diff_pair),
+            dimer_k=int(dimer_k),
         )
 
-        if mode == "Paste sequence":
-            text = st.text_area(
-                "Paste template sequence (A/C/G/T only)",
-                height=220,
-                key="qpcr_seq_paste",
-            )
-            seq = _parse_fasta_text(">x\n" + (text or ""))
-            if seq:
-                st.session_state["qpcr_template_seq"] = seq
-                st.success(f"Loaded sequence length: {len(seq)}")
+        amp_len = qpcr_amplicon_size_from_hits(fwd, rev)
 
-        elif mode == "Upload FASTA":
-            file = st.file_uploader("Upload FASTA file", type=["fa", "fasta", "txt"], key="qpcr_fasta")
-            if file:
-                content = file.read().decode("utf-8", errors="ignore")
-                seq = _parse_fasta_text(content)
-                st.session_state["qpcr_template_seq"] = seq
-                st.success(f"Loaded sequence length: {len(seq)}")
+        st.success("qPCR primers designed.")
+        st.write(f"Amplicon size (estimated on spliced template): **{amp_len} bp**")
 
-        elif mode == "NCBI accession":
-            acc = st.text_input("Enter NCBI accession", key="qpcr_ncbi")
-            if st.button("Fetch from NCBI", key="qpcr_fetch"):
-                try:
-                    fasta = _fetch_ncbi_fasta(acc)
-                    seq = _parse_fasta_text(fasta)
-                    if not seq:
-                        st.error("Fetched FASTA but could not parse any A/C/G/T bases.")
-                    else:
-                        st.session_state["qpcr_template_seq"] = seq
-                        st.success(f"Fetched {acc} | length: {len(seq)}")
-                except Exception as e:
-                    st.error(str(e))
+        rows = [
+            {
+                "Type": "FWD",
+                "Role": fwd.exon_name,
+                "Primer (5'→3')": fwd.seq_5to3,
+                "Length": fwd.length,
+                "Tm (°C)": round(fwd.tm_c, 1),
+                "GC (%)": round(fwd.gc_pct, 1),
+                "Score": round(fwd.score, 2),
+            },
+            {
+                "Type": "REV",
+                "Role": rev.exon_name,
+                "Primer (5'→3')": rev.seq_5to3,
+                "Length": rev.length,
+                "Tm (°C)": round(rev.tm_c, 1),
+                "GC (%)": round(rev.gc_pct, 1),
+                "Score": round(rev.score, 2),
+            },
+        ]
 
-        template = st.session_state.get("qpcr_template_seq", "")
-        if not template:
-            st.info("Paste a sequence, upload a FASTA file, or fetch an NCBI accession.")
-            add_footer()
-            return
+        st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
-        run = st.button("Design qPCR primers", key="qpcr_run_basic")
-        if not run:
-            add_footer()
-            return
-
-        try:
-            n = len(template)
-            min_window_needed = max(50, int(min_len) * 2)
-            start_w = max(min_window_needed, min(int(start_window), n))
-            end_w = max(min_window_needed, min(int(end_window), n))
-
-            fwd, rev, amp_len, fwd_start, rev_bind_start = design_qpcr_basic_primers(
-                template,
-                min_len=int(min_len),
-                max_len=int(max_len),
-                tm_target=float(tm_target),
-                tm_tol=float(tm_tol),
-                amplicon_min=int(amp_min),
-                amplicon_max=int(amp_max),
-                start_window=int(start_w),
-                end_window=int(end_w),
-                dimer_k=int(dimer_k),
+        if probe is not None:
+            st.subheader("TaqMan probe")
+            st.write("Probe is reported 5'→3' and sits between primers.")
+            st.dataframe(
+                pd.DataFrame([{
+                    "Probe (5'→3')": probe.seq_5to3,
+                    "Length": probe.length,
+                    "Tm (°C)": round(probe.tm_c, 1),
+                    "GC (%)": round(probe.gc_pct, 1),
+                    "Score": round(probe.score, 2),
+                }]),
+                use_container_width=True
             )
 
-            st.success("qPCR primers designed successfully.")
-            st.caption(SCORE_EXPLANATION)
+        st.subheader("Primer-BLAST link (NCBI)")
+        url = primer_blast_url_pair(fwd.seq_5to3, rev.seq_5to3, "Homo sapiens")
+        st.markdown(f"[Open in Primer-BLAST]({url})")
+        st.info(BLAST_INSTRUCTIONS)
 
-            rows = [
-                {
-                    "Type": "FWD",
-                    "Primer (5'→3')": fwd,
-                    "Length": len(fwd),
-                    "Tm (°C)": round(tm_wallace(fwd), 1),
-                    "GC (%)": round(gc_pct(fwd), 1),
-                    "Score": round(primer_score(fwd, float(tm_target)), 2),
-                    "Start (0-based)": fwd_start,
-                },
-                {
-                    "Type": "REV",
-                    "Primer (5'→3')": rev,
-                    "Length": len(rev),
-                    "Tm (°C)": round(tm_wallace(rev), 1),
-                    "GC (%)": round(gc_pct(rev), 1),
-                    "Score": round(primer_score(rev, float(tm_target)), 2),
-                    "Bind start (0-based)": rev_bind_start,
-                },
-            ]
-            st.dataframe(pd.DataFrame(rows), use_container_width=True)
-            st.write(f"Estimated qPCR amplicon length: **{amp_len} bp**")
+        st.subheader("Dimer check")
+        print_dimer_report_pair(fwd.seq_5to3, rev.seq_5to3)
 
-            st.subheader("Primer-BLAST link (NCBI)")
-            url = primer_blast_url_pair(fwd, rev, "Homo sapiens")
-            st.markdown(f"[Open in Primer-BLAST]({url})")
-            st.info(BLAST_INSTRUCTIONS)
+        add_footer()
 
-            st.subheader("Dimer check")
-            print_dimer_report_pair(fwd, rev)
-
-            add_footer()
-
-        except Exception as e:
-            st.error(str(e))
-            add_footer()
+    except Exception as e:
+        st.error(str(e))
+        add_footer()
