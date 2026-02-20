@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
 import requests
-import primer_engine  # IMPORTANT: use module import to avoid NameError
+import primer_engine
+...
+fwd, rev, amp_len, _, _ = primer_engine.design_basic_pcr_primers(...)
+...
+primer_engine.print_dimer_report_pair(fwd, rev)
 
 from utils.blast import primer_blast_url_pair
 from utils.primer_utils import gc_pct, tm_wallace, primer_score
