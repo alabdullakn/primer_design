@@ -19,5 +19,7 @@ import streamlit as st
 def render():
     st.title("Splicing primers")
     st.write("Design primers for exon skipping, intron retention, or alternative splicing.")
+    st.subheader("Examples")
+    st.image(str(SPLICING_IMG), use_container_width=True)
     # UI + logic here
 
