@@ -62,7 +62,7 @@ def render():
             amp_min = st.number_input("Amplicon min (bp)", 50, 5000, 100, key="reg_amp_min")
             amp_max = st.number_input("Amplicon max (bp)", 80, 8000, 500, key="reg_amp_max")
 
-        st.markdown("### Search windows (Option A)")
+        
         st.caption("Smaller values are allowed, but windows will be clamped safely at runtime.")
 
         # Option A: allow smaller inputs (min 50), then clamp before calling engine
