@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 
-from primer_engine import design_basic_pcr_primers, print_dimer_report
 from utils.blast import primer_blast_url_pair
 from utils.primer_utils import gc_pct, tm_wallace, primer_score
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
