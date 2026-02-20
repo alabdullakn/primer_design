@@ -1,29 +1,27 @@
-import streamlit as st
+mport streamlit as st
 import pandas as pd
 import requests
 
-import primer_engine  # must contain design_basic_pcr_primers + print_dimer_report_pair
-
+from primer_engine import design_basic_pcr_primers, print_dimer_report_pair
 from utils.blast import primer_blast_url_pair
 from utils.primer_utils import gc_pct, tm_wallace, primer_score
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from ui.footer import add_footer
 
 
-# ----------------------------
+# ============================
 # FASTA + NCBI helpers
-# ----------------------------
+# ============================
 
-def _parse_fasta_text(text: str) -> str:
-    """Parses FASTA or raw sequence text and returns A/C/G/T/N only (uppercase)."""
+def _parse_fasta_or_raw(text: str) -> str:
     if not text:
         return ""
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     seq_parts = []
-    for l in lines:
-        if l.startswith(">"):
+    for line in lines:
+        if line.startswith(">"):
             continue
-        seq_parts.append(l)
+        seq_parts.append(line)
     raw = "".join(seq_parts).upper()
     allowed = set("ACGTN")
     return "".join([c for c in raw if c in allowed])
@@ -39,25 +37,26 @@ def _fetch_ncbi_fasta(accession: str) -> str:
     )
     r = requests.get(url, timeout=20)
     if r.status_code != 200:
-        raise RuntimeError("Failed to fetch accession from NCBI.")
+        raise RuntimeError("Failed to fetch accession from NCBI (bad accession or NCBI blocked).")
     return r.text
 
 
-# ----------------------------
-# Main Render
-# ----------------------------
+# ============================
+# Main
+# ============================
 
 def render():
     st.title("Regular PCR")
-    st.write("Design a standard forward and reverse primer pair from a single template sequence.")
+    st.write("Paste a DNA template, upload a FASTA, or fetch from an NCBI accession, then design one primer pair.")
 
-    # session state to persist fetched/uploaded sequence across reruns
-    if "reg_sequence" not in st.session_state:
-        st.session_state["reg_sequence"] = ""
+    # init session state
+    if "reg_template" not in st.session_state:
+        st.session_state.reg_template = ""
 
     # ============================
     # Primer parameters
     # ============================
+
     with st.expander("Primer design parameters", expanded=False):
         c1, c2 = st.columns(2)
 
@@ -71,14 +70,17 @@ def render():
             amp_min = st.number_input("Amplicon min (bp)", 50, 5000, 100, key="reg_amp_min")
             amp_max = st.number_input("Amplicon max (bp)", 80, 8000, 500, key="reg_amp_max")
 
-        dimer_k = st.number_input("3' dimer check window (k)", 3, 10, 4, key="reg_dimer_k")
+        start_window = st.number_input("Search window at 5' end (bp)", 50, 5000, 300, key="reg_start_win")
+        end_window = st.number_input("Search window at 3' end (bp)", 50, 5000, 300, key="reg_end_win")
+        dimer_k = st.number_input("3' dimer block window (k)", 3, 10, 4, key="reg_dimer_k")
 
     st.markdown("---")
 
     # ============================
     # Sequence input
     # ============================
-    st.header("Sequence input")
+
+    st.subheader("Sequence input")
 
     mode = st.radio(
         "Choose input type",
@@ -87,69 +89,86 @@ def render():
         key="reg_input_mode",
     )
 
+    template = ""
+
     if mode == "Paste sequence":
-        pasted = st.text_area(
-            "Paste template sequence (A/C/G/T/N only)",
-            height=180,
+        raw = st.text_area(
+            "Paste template sequence (A/C/G/T only)",
+            height=220,
             key="reg_seq_paste",
         )
-        seq = _parse_fasta_text(">x\n" + pasted)
-        st.session_state["reg_sequence"] = seq
+        template = _parse_fasta_or_raw(raw)
 
     elif mode == "Upload FASTA":
         file = st.file_uploader("Upload FASTA file", type=["fa", "fasta", "txt"], key="reg_fasta")
-        if file is not None:
+        if file:
             content = file.read().decode("utf-8", errors="ignore")
-            seq = _parse_fasta_text(content)
-            st.session_state["reg_sequence"] = seq
-            if seq:
-                st.success(f"Loaded sequence length: {len(seq)}")
+            template = _parse_fasta_or_raw(content)
+            st.session_state.reg_template = template
 
-    else:  # NCBI accession
+        if st.session_state.reg_template:
+            st.success(f"Loaded sequence length: {len(st.session_state.reg_template)}")
+            template = st.text_area(
+                "Template (you can edit before designing)",
+                value=st.session_state.reg_template,
+                height=180,
+                key="reg_template_edit_upload",
+            )
+            template = _parse_fasta_or_raw(template)
+
+    else:
         acc = st.text_input("Enter NCBI accession", key="reg_ncbi")
-        if st.button("Fetch from NCBI", key="reg_fetch"):
+        fetch = st.button("Fetch from NCBI", key="reg_fetch")
+
+        if fetch:
             try:
                 fasta = _fetch_ncbi_fasta(acc)
-                seq = _parse_fasta_text(fasta)
-                st.session_state["reg_sequence"] = seq
-                if seq:
-                    st.success(f"Fetched {acc} | length: {len(seq)}")
-                else:
-                    st.error("Fetched data, but no sequence was parsed.")
+                st.session_state.reg_template = _parse_fasta_or_raw(fasta)
+                st.success(f"Fetched {acc} | length: {len(st.session_state.reg_template)}")
             except Exception as e:
                 st.error(str(e))
 
-    sequence = st.session_state["reg_sequence"]
+        if st.session_state.reg_template:
+            template = st.text_area(
+                "Template (auto-filled after fetch, you can edit before designing)",
+                value=st.session_state.reg_template,
+                height=180,
+                key="reg_template_edit_ncbi",
+            )
+            template = _parse_fasta_or_raw(template)
 
-    if not sequence:
-        st.info("Add a template sequence to continue.")
+    if not template:
         add_footer()
         return
 
-    st.caption(f"Template length: {len(sequence)} bp")
+    st.caption(f"Template length: {len(template)} bp")
     st.markdown("---")
 
-    # ============================
-    # Run design
-    # ============================
     run = st.button("Design primers", key="reg_run")
     if not run:
         add_footer()
         return
 
+    # ============================
+    # Run design
+    # ============================
+
     try:
-        fwd, rev, amp_len, fwd_i, rev_i = primer_engine.design_basic_pcr_primers(
-            sequence,
+        fwd_hit, rev_hit, amp_len, _, _ = design_basic_pcr_primers(
+            template,
             min_len=int(min_len),
             max_len=int(max_len),
             tm_target=float(tm_target),
             tm_tol=float(tm_tol),
-            start_window=300,
-            end_window=300,
+            start_window=int(start_window),
+            end_window=int(end_window),
             amplicon_min=int(amp_min),
             amplicon_max=int(amp_max),
             dimer_k=int(dimer_k),
         )
+
+        fwd = fwd_hit.seq_5to3
+        rev = rev_hit.seq_5to3
 
         st.success("Primers designed successfully.")
         st.caption(SCORE_EXPLANATION)
@@ -157,21 +176,19 @@ def render():
         rows = [
             {
                 "Type": "FWD",
-                "Primer (5'->3')": fwd,
+                "Primer (5'→3')": fwd,
                 "Length": len(fwd),
                 "Tm (°C)": round(tm_wallace(fwd), 1),
                 "GC (%)": round(gc_pct(fwd), 1),
                 "Score": round(primer_score(fwd, tm_target), 2),
-                "Start (0-based)": int(fwd_i),
             },
             {
                 "Type": "REV",
-                "Primer (5'->3')": rev,
+                "Primer (5'→3')": rev,
                 "Length": len(rev),
                 "Tm (°C)": round(tm_wallace(rev), 1),
                 "GC (%)": round(gc_pct(rev), 1),
                 "Score": round(primer_score(rev, tm_target), 2),
-                "Bind start (0-based)": int(rev_i),
             },
         ]
 
@@ -183,8 +200,8 @@ def render():
         st.markdown(f"[Open in Primer-BLAST]({url})")
         st.info(BLAST_INSTRUCTIONS)
 
-        st.subheader("Dimer check")
-        primer_engine.print_dimer_report_pair(fwd, rev)
+        st.subheader("Heterodimer check")
+        print_dimer_report_pair(fwd, rev)
 
         add_footer()
 
