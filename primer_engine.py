@@ -1083,4 +1083,162 @@ def qpcr_amplicon_size(template_seq_with_marker: str, fwd: "PrimerHit", rev: "Pr
     rev_end = rev.start_0based + rev.length
     return max(0, rev_end - fwd.start_0based)
 
+# ============================
+# Regular PCR (single template)
+# ============================
 
+def _collect_forward_candidates(template: str, start_window: int, min_len: int, max_len: int,
+                                tm_target: float, tm_tol: float) -> List[PrimerHit]:
+    template = clean_seq(template)
+    window_end = min(len(template), max(0, start_window))
+    candidates: List[PrimerHit] = []
+
+    for L in range(min_len, max_len + 1):
+        for i in range(0, max(0, window_end - L + 1)):
+            seq = template[i:i + L]  # forward primer is same as template window
+            scored = score_candidate(seq, tm_target, tm_tol)
+            if scored is None:
+                continue
+            score, tm, gc = scored
+            candidates.append(
+                PrimerHit(
+                    kind="FWD",
+                    exon_name="Template",
+                    start_0based=i,
+                    length=L,
+                    seq_5to3=seq,
+                    tm_c=tm,
+                    gc_pct=gc,
+                    score=score
+                )
+            )
+
+    if not candidates:
+        raise RuntimeError("No forward primer found in the start window. Try wider Tm tolerance or length range.")
+    candidates.sort(key=lambda x: x.score)
+    return candidates[:200]
+
+
+def _collect_reverse_candidates(template: str, end_window: int, min_len: int, max_len: int,
+                                tm_target: float, tm_tol: float) -> List[PrimerHit]:
+    template = clean_seq(template)
+    n = len(template)
+    win = min(n, max(0, end_window))
+    window_start = max(0, n - win)
+    candidates: List[PrimerHit] = []
+
+    for L in range(min_len, max_len + 1):
+        for i in range(window_start, n - L + 1):
+            bind_site = template[i:i + L]      # binding site on template (5'->3')
+            rev_seq = revcomp(bind_site)       # primer you order (5'->3')
+            scored = score_candidate(rev_seq, tm_target, tm_tol)
+            if scored is None:
+                continue
+            score, tm, gc = scored
+            candidates.append(
+                PrimerHit(
+                    kind="REV",
+                    exon_name="Template",
+                    start_0based=i,
+                    length=L,
+                    seq_5to3=rev_seq,
+                    tm_c=tm,
+                    gc_pct=gc,
+                    score=score,
+                    template_seq_5to3=bind_site
+                )
+            )
+
+    if not candidates:
+        raise RuntimeError("No reverse primer found in the end window. Try wider Tm tolerance or length range.")
+    candidates.sort(key=lambda x: x.score)
+    return candidates[:200]
+
+
+def design_basic_pcr_primers(
+    template: str,
+    min_len: int = 18,
+    max_len: int = 25,
+    tm_target: float = 60.0,
+    tm_tol: float = 5.0,
+    start_window: int = 300,
+    end_window: int = 300,
+    amplicon_min: int = 100,
+    amplicon_max: int = 500,
+    dimer_k: int = 4
+) -> Tuple[PrimerHit, PrimerHit, int, int, int]:
+    """
+    Returns (fwd_hit, rev_hit, amplicon_len_bp, fwd_start, rev_start)
+
+    Notes:
+    - forward primer searched in first start_window bases
+    - reverse primer searched in last end_window bases
+    - amplicon length computed on the template as:
+        (rev_binding_start + rev_len) - fwd_start
+    """
+    template = clean_seq(template)
+    n = len(template)
+
+    if n < (amplicon_min + min_len * 2):
+        raise RuntimeError("Template too short for your amplicon/primer constraints.")
+
+    fwds = _collect_forward_candidates(template, start_window, min_len, max_len, tm_target, tm_tol)
+    revs = _collect_reverse_candidates(template, end_window, min_len, max_len, tm_target, tm_tol)
+
+    best = None  # (total_score, fwd_hit, rev_hit, amp_len)
+
+    mid = (amplicon_min + amplicon_max) / 2.0
+    span = max(1.0, (amplicon_max - amplicon_min))
+
+    for f in fwds:
+        for r in revs:
+            # reverse binding site must be downstream of forward start
+            amp_len = (r.start_0based + r.length) - f.start_0based
+            if amp_len < amplicon_min or amp_len > amplicon_max:
+                continue
+
+            # quick heterodimer screen (3' complementarity)
+            if has_3prime_complementarity(f.seq_5to3, r.seq_5to3, k=dimer_k):
+                continue
+            if has_3prime_complementarity(r.seq_5to3, f.seq_5to3, k=dimer_k):
+                continue
+
+            # score: primer quality + small penalty for amplicon far from midpoint
+            length_penalty = abs(amp_len - mid) / span
+            total = f.score + r.score + (length_penalty * 2.0)
+
+            if best is None or total < best[0]:
+                best = (total, f, r, amp_len)
+
+    if best is None:
+        raise RuntimeError(
+            "No primer pair found with your constraints. "
+            "Try widening amplicon range, widening Tm tolerance, or reducing dimer_k."
+        )
+
+    _, f_best, r_best, amp_best = best
+    return f_best, r_best, int(amp_best), f_best.start_0based, r_best.start_0based
+
+
+def print_dimer_report_pair(fwd_seq: str, rev_seq: str) -> None:
+    """
+    Streamlit table for heterodimer risk between a single forward and reverse primer sequence.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    f = clean_seq(fwd_seq)
+    r = clean_seq(rev_seq)
+
+    risk_fr = dimer_risk_percent(f, r, max_k=8)
+    risk_rf = dimer_risk_percent(r, f, max_k=8)
+
+    st.table([
+        {
+            "Pair": "FWD vs REV",
+            "Heuristic dimer risk (%)": round(max(risk_fr, risk_rf), 1),
+            "Max direction": "FWD->REV" if risk_fr >= risk_rf else "REV->FWD"
+        }
+    ])
