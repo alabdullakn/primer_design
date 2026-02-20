@@ -1,9 +1,10 @@
 # primer_engine.py
 # Contains:
-# - Exon primer helper (2 forward + 1 reverse)  [your existing]
-# - qPCR junction helper                        [your existing]
-# - Regular PCR primer pair design              [added]
-# - Streamlit dimer reports                     [added]
+# - Exon primer helper (2 forward + 1 reverse)
+# - Regular PCR primer pair design
+# - qPCR junction primer design (legacy: design_qpcr_junction_primers)
+# - qPCR SYBR vs TaqMan (new: design_qpcr_junction_pair)
+# - Streamlit dimer reports
 
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
@@ -34,8 +35,18 @@ class PrimerHit:
     tm_c: float
     gc_pct: float
     score: float
-    template_seq_5to3: Optional[str] = None  # only for REV: binding site in exon (as given)
+    template_seq_5to3: Optional[str] = None  # only for REV: binding site on forward strand
     blast: Optional[BlastSummary] = None
+
+
+@dataclass
+class ProbeHit:
+    start_0based: int
+    length: int
+    seq_5to3: str
+    tm_c: float
+    gc_pct: float
+    score: float
 
 
 # ---------------- Basic helpers ----------------
@@ -127,7 +138,7 @@ def score_candidate(seq: str, tm_target: float, tm_tol: float) -> Optional[Tuple
     return score, tm, gc
 
 
-# ---------------- Exon splicing design (your existing) ----------------
+# ---------------- Exon splicing design ----------------
 
 def best_primer_from_exon(
     exon_seq: str,
@@ -151,8 +162,16 @@ def best_primer_from_exon(
                 continue
 
             score, tm, gc = scored
-            hit = PrimerHit(kind=kind, exon_name=exon_name, start_0based=i,
-                            length=L, seq_5to3=primer, tm_c=tm, gc_pct=gc, score=score)
+            hit = PrimerHit(
+                kind=kind,
+                exon_name=exon_name,
+                start_0based=i,
+                length=L,
+                seq_5to3=primer,
+                tm_c=tm,
+                gc_pct=gc,
+                score=score,
+            )
 
             if best is None or hit.score < best.score:
                 best = hit
@@ -248,7 +267,7 @@ def print_dimer_report(f1: PrimerHit, f2: PrimerHit, r3: PrimerHit) -> None:
     st.table(rows)
 
 
-# ---------------- Regular PCR design (ADDED) ----------------
+# ---------------- Regular PCR design ----------------
 
 def design_basic_pcr_primers(
     template_seq: str,
@@ -265,15 +284,11 @@ def design_basic_pcr_primers(
     """
     Returns:
       (fwd_primer_5to3, rev_primer_5to3, amplicon_len, fwd_start, rev_bind_start)
-
-    rev_bind_start is the 0-based start position of the reverse primer binding site
-    on the forward strand (template).
     """
 
     seq = clean_seq(template_seq)
     n = len(seq)
 
-    # clamp windows to template length
     start_window = max(1, min(start_window, n))
     end_window = max(1, min(end_window, n))
 
@@ -289,22 +304,18 @@ def design_basic_pcr_primers(
 
     best_pair = None  # (total_score, fwd_seq, rev_seq, amp_len, fwd_start, rev_bind_start)
 
-    # Enumerate forward primer candidates in first start_window bases
     for Lf in range(min_len, max_len + 1):
         for i in range(0, fwd_region_end - Lf + 1):
             fwd = seq[i:i + Lf]
             f_scored = score_candidate(fwd, tm_target, tm_tol)
             if f_scored is None:
                 continue
-            f_score, f_tm, f_gc = f_scored
+            f_score, _, _ = f_scored
             fwd_3 = i + Lf
 
-            # reverse primer binding site must be downstream to make an amplicon
-            # reverse binding site start j gives amp_len = (j+Lr) - i
             search_j_min = fwd_3 + amplicon_min - 1
             search_j_max = fwd_3 + amplicon_max
 
-            # constrain to last end_window region
             j_start = max(rev_region_start, search_j_min)
             j_end = min(n, search_j_max)
 
@@ -320,9 +331,8 @@ def design_basic_pcr_primers(
                     r_scored = score_candidate(rev, tm_target, tm_tol)
                     if r_scored is None:
                         continue
-                    r_score, r_tm, r_gc = r_scored
+                    r_score, _, _ = r_scored
 
-                    # quick 3' dimer filter between fwd and rev
                     if has_3prime_complementarity(fwd, rev, k=dimer_k):
                         continue
 
@@ -358,15 +368,17 @@ def print_dimer_report_pair(fwd_seq: str, rev_seq: str) -> None:
     except Exception:
         return
 
-    risk = dimer_risk_percent(fwd_seq, rev_seq, max_k=8)
+    risk_fwd_to_rev = dimer_risk_percent(fwd_seq, rev_seq, max_k=8)
+    risk_rev_to_fwd = dimer_risk_percent(rev_seq, fwd_seq, max_k=8)
+
     st.table([{
-        "FWD (5'->3')": fwd_seq,
-        "REV (5'->3')": rev_seq,
-        "Heuristic dimer risk (%)": round(risk, 1)
+        "Pair": "FWD vs REV",
+        "Heuristic dimer risk (FWD->REV) %": round(risk_fwd_to_rev, 1),
+        "Heuristic dimer risk (REV->FWD) %": round(risk_rev_to_fwd, 1),
     }])
 
 
-# ---------------- qPCR (your existing block, kept) ----------------
+# ---------------- qPCR junction helpers (single source of truth) ----------------
 
 def parse_junction_marked_seq(seq_with_marker: str, marker: str = "^") -> Tuple[str, str]:
     s = (seq_with_marker or "")
@@ -389,6 +401,20 @@ def build_junction_primer_reverse(left: str, right: str, left_take: int, right_t
     return revcomp(template)
 
 
+def qpcr_amplicon_size(template_seq_with_marker: str, fwd: PrimerHit, rev: PrimerHit) -> int:
+    left, right = parse_junction_marked_seq(template_seq_with_marker, marker="^")
+    template = left + right
+    rev_end = rev.start_0based + rev.length
+    return max(0, rev_end - fwd.start_0based)
+
+
+def qpcr_amplicon_size_from_hits(fwd: PrimerHit, rev: PrimerHit) -> int:
+    rev_end = rev.start_0based + rev.length
+    return max(0, rev_end - fwd.start_0based)
+
+
+# ---------------- qPCR legacy function (kept for compatibility) ----------------
+
 def design_qpcr_junction_primers(
     seq_with_junction_marker: str,
     span_primer: str = "FWD",
@@ -400,7 +426,6 @@ def design_qpcr_junction_primers(
     amplicon_max: int = 200,
     junction_min_overlap_each_side: int = 6
 ) -> Tuple[PrimerHit, PrimerHit]:
-
     left, right = parse_junction_marked_seq(seq_with_junction_marker, marker="^")
     template = left + right
     junction_index = len(left)
@@ -527,10 +552,403 @@ def design_qpcr_junction_primers(
     return best_fwd, best_rev
 
 
-def qpcr_amplicon_size(template_seq_with_marker: str, fwd: PrimerHit, rev: PrimerHit) -> int:
-    left, right = parse_junction_marked_seq(template_seq_with_marker, marker="^")
+# ---------------- New qPCR SYBR vs TaqMan (AUTO junction primer) ----------------
+
+def _qpcr_score_candidate(
+    seq: str,
+    tm_target: float,
+    tm_tol: float,
+    gc_min: float,
+    gc_max: float,
+    max_homopolymer: int,
+    forbid_last_base: Optional[str] = None,
+) -> Optional[Tuple[float, float, float]]:
+    tm = tm_wallace(seq)
+    gc = gc_content(seq)
+
+    if abs(tm - tm_target) > tm_tol:
+        return None
+    if not (gc_min <= gc <= gc_max):
+        return None
+    if max_run(seq) > max_homopolymer:
+        return None
+    if self_complementarity_flag(seq):
+        return None
+    if forbid_last_base and seq.endswith(forbid_last_base):
+        return None
+
+    score = 0.0
+    score += abs(tm - tm_target) * 4.0
+    if seq[-1] not in "GC":
+        score += 1.5
+    return score, tm, gc
+
+
+def _pair_ok_tm_diff(fwd: PrimerHit, rev: PrimerHit, max_diff: float) -> bool:
+    return abs(fwd.tm_c - rev.tm_c) <= max_diff
+
+
+def _find_partner_reverse_on_template(
+    template: str,
+    fwd_start: int,
+    fwd_len: int,
+    min_len: int,
+    max_len: int,
+    tm_target: float,
+    tm_tol: float,
+    gc_min: float,
+    gc_max: float,
+    max_homopolymer: int,
+    amplicon_min: int,
+    amplicon_max: int,
+    dimer_k: int,
+    fwd_seq: str,
+) -> Optional[PrimerHit]:
+    fwd_3p = fwd_start + fwd_len
+    search_start = fwd_3p + amplicon_min - 1
+    search_end = min(len(template), fwd_3p + amplicon_max)
+
+    if search_start >= search_end:
+        return None
+
+    best = None
+    for L in range(min_len, max_len + 1):
+        for i in range(search_start, search_end - L + 1):
+            bind_site = template[i:i + L]
+            rev_seq = revcomp(bind_site)
+
+            scored = _qpcr_score_candidate(
+                rev_seq,
+                tm_target=tm_target,
+                tm_tol=tm_tol,
+                gc_min=gc_min,
+                gc_max=gc_max,
+                max_homopolymer=max_homopolymer,
+            )
+            if scored is None:
+                continue
+
+            if has_3prime_complementarity(fwd_seq, rev_seq, k=dimer_k):
+                continue
+            if has_3prime_complementarity(rev_seq, fwd_seq, k=dimer_k):
+                continue
+
+            score, tm, gc = scored
+            hit = PrimerHit(
+                kind="REV",
+                exon_name="Partner",
+                start_0based=i,
+                length=L,
+                seq_5to3=rev_seq,
+                tm_c=tm,
+                gc_pct=gc,
+                score=score,
+                template_seq_5to3=bind_site
+            )
+
+            if best is None or hit.score < best.score:
+                best = hit
+    return best
+
+
+def _find_partner_forward_on_template(
+    template: str,
+    rev_bind_start: int,
+    min_len: int,
+    max_len: int,
+    tm_target: float,
+    tm_tol: float,
+    gc_min: float,
+    gc_max: float,
+    max_homopolymer: int,
+    amplicon_min: int,
+    amplicon_max: int,
+    dimer_k: int,
+    rev_seq: str,
+) -> Optional[PrimerHit]:
+    search_end = max(0, rev_bind_start - amplicon_min + 1)
+    search_start = max(0, rev_bind_start - amplicon_max)
+
+    if search_start >= search_end:
+        return None
+
+    best = None
+    for L in range(min_len, max_len + 1):
+        for i in range(search_start, search_end - L + 1):
+            fwd_seq = template[i:i + L]
+
+            scored = _qpcr_score_candidate(
+                fwd_seq,
+                tm_target=tm_target,
+                tm_tol=tm_tol,
+                gc_min=gc_min,
+                gc_max=gc_max,
+                max_homopolymer=max_homopolymer,
+            )
+            if scored is None:
+                continue
+
+            if has_3prime_complementarity(fwd_seq, rev_seq, k=dimer_k):
+                continue
+            if has_3prime_complementarity(rev_seq, fwd_seq, k=dimer_k):
+                continue
+
+            score, tm, gc = scored
+            hit = PrimerHit(
+                kind="FWD",
+                exon_name="Partner",
+                start_0based=i,
+                length=L,
+                seq_5to3=fwd_seq,
+                tm_c=tm,
+                gc_pct=gc,
+                score=score
+            )
+            if best is None or hit.score < best.score:
+                best = hit
+    return best
+
+
+def design_taqman_probe_between(
+    template: str,
+    fwd: PrimerHit,
+    rev: PrimerHit,
+    probe_tm_target: float = 69.0,
+    probe_tm_tol: float = 3.0,
+    probe_min_len: int = 18,
+    probe_max_len: int = 30,
+) -> ProbeHit:
+    fwd_end = fwd.start_0based + fwd.length
+    rev_start = rev.start_0based
+
+    if rev_start - fwd_end < probe_min_len:
+        raise RuntimeError("Amplicon too short to place a TaqMan probe between primers.")
+
+    region = template[fwd_end:rev_start]
+    best = None
+
+    for L in range(probe_min_len, probe_max_len + 1):
+        for i in range(0, len(region) - L + 1):
+            pseq = region[i:i + L]
+
+            # Common practical probe rules
+            # - avoid 5' G
+            if pseq.startswith("G"):
+                continue
+            if max_run(pseq) > 3:
+                continue
+            if self_complementarity_flag(pseq):
+                continue
+
+            tm = tm_wallace(pseq)
+            gc = gc_content(pseq)
+            if abs(tm - probe_tm_target) > probe_tm_tol:
+                continue
+            if not (30.0 <= gc <= 80.0):
+                continue
+
+            score = 0.0
+            score += abs(tm - probe_tm_target) * 4.0
+            if pseq.count("G") / len(pseq) > 0.4:
+                score += 1.5
+
+            hit = ProbeHit(
+                start_0based=fwd_end + i,
+                length=L,
+                seq_5to3=pseq,
+                tm_c=tm,
+                gc_pct=gc,
+                score=score
+            )
+            if best is None or hit.score < best.score:
+                best = hit
+
+    if best is None:
+        raise RuntimeError("No valid TaqMan probe found between primers. Try relaxing probe rules or increasing amplicon size.")
+    return best
+
+
+def design_qpcr_junction_pair(
+    seq_with_junction_marker: str,
+    chemistry: str = "SYBR",               # "SYBR" or "TAQMAN"
+    junction_primer: str = "AUTO",         # "AUTO", "FWD", "REV"
+    min_len: int = 18,
+    max_len: int = 24,
+    primer_tm_target: float = 60.0,
+    primer_tm_tol: float = 2.0,
+    primer_gc_min: float = 40.0,
+    primer_gc_max: float = 60.0,
+    max_homopolymer: int = 3,
+    amplicon_min: int = 70,
+    amplicon_max: int = 200,
+    junction_min_overlap_each_side: int = 6,
+    max_tm_diff_pair: float = 1.0,
+    dimer_k: int = 4,
+) -> Tuple[PrimerHit, PrimerHit, Optional[ProbeHit]]:
+    """
+    Returns (fwd, rev, probe_or_None)
+
+    Junction marker is '^' in the input sequence.
+    One primer spans the junction.
+    junction_primer:
+      - "FWD" forces forward to span
+      - "REV" forces reverse to span
+      - "AUTO" tries both and returns the best pair
+    chemistry:
+      - "SYBR" returns (fwd, rev, None)
+      - "TAQMAN" returns (fwd, rev, probe)
+    """
+
+    left, right = parse_junction_marked_seq(seq_with_junction_marker, marker="^")
     template = left + right
-    rev_end = rev.start_0based + rev.length
-    return max(0, rev_end - fwd.start_0based)
+    junction_index = len(left)
 
+    def try_span(span: str):
+        best = None  # (total_score, fwd, rev)
+        for L in range(min_len, max_len + 1):
+            for left_take in range(junction_min_overlap_each_side, L - junction_min_overlap_each_side + 1):
+                right_take = L - left_take
+                if right_take < junction_min_overlap_each_side:
+                    continue
 
+                if span == "FWD":
+                    jseq = build_junction_primer_forward(left, right, left_take, right_take)
+                    scored = _qpcr_score_candidate(
+                        jseq,
+                        tm_target=primer_tm_target,
+                        tm_tol=primer_tm_tol,
+                        gc_min=primer_gc_min,
+                        gc_max=primer_gc_max,
+                        max_homopolymer=max_homopolymer,
+                    )
+                    if scored is None:
+                        continue
+                    j_score, j_tm, j_gc = scored
+                    fwd = PrimerHit(
+                        kind="FWD",
+                        exon_name="Junction",
+                        start_0based=junction_index - left_take,
+                        length=L,
+                        seq_5to3=jseq,
+                        tm_c=j_tm,
+                        gc_pct=j_gc,
+                        score=j_score
+                    )
+
+                    rev = _find_partner_reverse_on_template(
+                        template=template,
+                        fwd_start=fwd.start_0based,
+                        fwd_len=fwd.length,
+                        min_len=min_len,
+                        max_len=max_len,
+                        tm_target=primer_tm_target,
+                        tm_tol=primer_tm_tol,
+                        gc_min=primer_gc_min,
+                        gc_max=primer_gc_max,
+                        max_homopolymer=max_homopolymer,
+                        amplicon_min=amplicon_min,
+                        amplicon_max=amplicon_max,
+                        dimer_k=dimer_k,
+                        fwd_seq=fwd.seq_5to3,
+                    )
+                    if rev is None:
+                        continue
+                    if not _pair_ok_tm_diff(fwd, rev, max_tm_diff_pair):
+                        continue
+
+                    total = fwd.score + rev.score
+                    if best is None or total < best[0]:
+                        best = (total, fwd, rev)
+
+                else:
+                    # reverse spans junction
+                    template_span = build_junction_primer_forward(left, right, left_take, right_take)
+                    rev_span = revcomp(template_span)
+
+                    scored = _qpcr_score_candidate(
+                        rev_span,
+                        tm_target=primer_tm_target,
+                        tm_tol=primer_tm_tol,
+                        gc_min=primer_gc_min,
+                        gc_max=primer_gc_max,
+                        max_homopolymer=max_homopolymer,
+                    )
+                    if scored is None:
+                        continue
+                    j_score, j_tm, j_gc = scored
+                    rev = PrimerHit(
+                        kind="REV",
+                        exon_name="Junction",
+                        start_0based=junction_index - left_take,
+                        length=L,
+                        seq_5to3=rev_span,
+                        tm_c=j_tm,
+                        gc_pct=j_gc,
+                        score=j_score,
+                        template_seq_5to3=template_span
+                    )
+
+                    fwd = _find_partner_forward_on_template(
+                        template=template,
+                        rev_bind_start=rev.start_0based,
+                        min_len=min_len,
+                        max_len=max_len,
+                        tm_target=primer_tm_target,
+                        tm_tol=primer_tm_tol,
+                        gc_min=primer_gc_min,
+                        gc_max=primer_gc_max,
+                        max_homopolymer=max_homopolymer,
+                        amplicon_min=amplicon_min,
+                        amplicon_max=amplicon_max,
+                        dimer_k=dimer_k,
+                        rev_seq=rev.seq_5to3,
+                    )
+                    if fwd is None:
+                        continue
+                    if not _pair_ok_tm_diff(fwd, rev, max_tm_diff_pair):
+                        continue
+
+                    total = fwd.score + rev.score
+                    if best is None or total < best[0]:
+                        best = (total, fwd, rev)
+
+        return best
+
+    jp = (junction_primer or "AUTO").upper().strip()
+    candidates = []
+
+    if jp == "FWD":
+        r = try_span("FWD")
+        if r:
+            candidates.append(r)
+    elif jp == "REV":
+        r = try_span("REV")
+        if r:
+            candidates.append(r)
+    else:
+        r1 = try_span("FWD")
+        r2 = try_span("REV")
+        if r1:
+            candidates.append(r1)
+        if r2:
+            candidates.append(r2)
+
+    if not candidates:
+        raise RuntimeError("No qPCR junction primer pair found. Try widening Tm tolerance, length range, or amplicon window.")
+
+    candidates.sort(key=lambda x: x[0])
+    _, best_fwd, best_rev = candidates[0]
+
+    probe = None
+    if (chemistry or "SYBR").upper().strip() == "TAQMAN":
+        probe = design_taqman_probe_between(
+            template=template,
+            fwd=best_fwd,
+            rev=best_rev,
+            probe_tm_target=69.0,
+            probe_tm_tol=3.0,
+            probe_min_len=18,
+            probe_max_len=30,
+        )
+
+    return best_fwd, best_rev, probe
