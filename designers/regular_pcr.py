@@ -237,7 +237,7 @@ def render():
             win_cap_ui = 20000
             start_window = st.slider(
                 "Forward search window (bp from 5')",
-                min_value=200,
+                min_value=50,
                 max_value=win_cap_ui,
                 value=2000,
                 step=100,
@@ -245,7 +245,7 @@ def render():
             )
             end_window = st.slider(
                 "Reverse search window (bp from 3')",
-                min_value=200,
+                min_value=50,
                 max_value=win_cap_ui,
                 value=2000,
                 step=100,
