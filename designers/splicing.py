@@ -125,3 +125,121 @@ def render():
 
     st.markdown("---")
     st.button("Design primers", key="splicing_design_btn")
+
+
+
+
+    try:
+        # If user only selected pairs that need one forward, we still need to pass
+        # something for exon1/exon2 into the engine. Use a safe fallback.
+        exon1_safe = exon_fwd_a.strip() if exon_fwd_a.strip() else exon_fwd_b.strip()
+        exon2_safe = exon_fwd_b.strip() if exon_fwd_b.strip() else exon1_safe
+
+        res_A = None  # results when using Reverse A sequence
+        res_B = None  # results when using Reverse B sequence
+
+        # Run engine for Reverse A set if any selected pair ends with REV A
+        if needs_rev_a:
+            p1A, p2A, p3A = design_exon_primers(
+                exon1_safe,
+                exon2_safe,
+                exon_rev_a.strip(),
+                min_len=min_len,
+                max_len=max_len,
+                tm_target=tm_target,
+                tm_tol=tm_tol,
+                dimer_k=dimer_k,
+            )
+            res_A = (p1A, p2A, p3A)
+
+        # Run engine for Reverse B set if any selected pair ends with REV B
+        if needs_rev_b:
+            p1B, p2B, p3B = design_exon_primers(
+                exon1_safe,
+                exon2_safe,
+                exon_rev_b.strip(),
+                min_len=min_len,
+                max_len=max_len,
+                tm_target=tm_target,
+                tm_tol=tm_tol,
+                dimer_k=dimer_k,
+            )
+            res_B = (p1B, p2B, p3B)
+
+        st.success("Primers designed successfully.")
+        st.caption(SCORE_EXPLANATION)
+
+        out_rows = []
+        blast_links = []
+        org = "Homo sapiens"
+
+        def add_pair(pair_name: str, fwd_obj, rev_obj):
+            out_rows.append(
+                {
+                    "Pair": pair_name,
+                    "Type": "FWD",
+                    "Primer (5'→3')": fwd_obj.seq_5to3,
+                    "Length": fwd_obj.length,
+                    "Tm (°C)": round(fwd_obj.tm_c, 1),
+                    "GC (%)": round(fwd_obj.gc_pct, 1),
+                    "Score": round(fwd_obj.score, 2),
+                }
+            )
+            out_rows.append(
+                {
+                    "Pair": pair_name,
+                    "Type": "REV",
+                    "Primer (5'→3')": rev_obj.seq_5to3,
+                    "Length": rev_obj.length,
+                    "Tm (°C)": round(rev_obj.tm_c, 1),
+                    "GC (%)": round(rev_obj.gc_pct, 1),
+                    "Score": round(rev_obj.score, 2),
+                }
+            )
+            blast_links.append(
+                (pair_name, primer_blast_url_pair(fwd_obj.seq_5to3, rev_obj.seq_5to3, org))
+            )
+
+        # Build outputs for only the selected pairs
+        for p in selected_pairs:
+            if p == "FWD A + REV A":
+                if res_A is None:
+                    continue
+                p1A, p2A, p3A = res_A
+                add_pair("FWD A + REV A", p1A, p3A)
+
+            elif p == "FWD B + REV A":
+                if res_A is None:
+                    continue
+                p1A, p2A, p3A = res_A
+                add_pair("FWD B + REV A", p2A, p3A)
+
+            elif p == "FWD A + REV B":
+                if res_B is None:
+                    continue
+                p1B, p2B, p3B = res_B
+                add_pair("FWD A + REV B", p1B, p3B)
+
+        if out_rows:
+            st.dataframe(pd.DataFrame(out_rows), use_container_width=True)
+
+        st.subheader("Primer-BLAST links (NCBI)")
+        for name, url in blast_links:
+            st.markdown(f"**{name}**: [Open in Primer-BLAST]({url})")
+        st.info(BLAST_INSTRUCTIONS)
+
+        # Dimer reports for each reverse set (only if generated)
+        if res_A is not None:
+            st.subheader("Dimer check (Reverse A set)")
+            p1A, p2A, p3A = res_A
+            print_dimer_report(p1A, p2A, p3A)
+
+        if res_B is not None:
+            st.subheader("Dimer check (Reverse B set)")
+            p1B, p2B, p3B = res_B
+            print_dimer_report(p1B, p2B, p3B)
+
+        add_footer()
+
+    except Exception as e:
+        st.error(str(e))
