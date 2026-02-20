@@ -6,6 +6,12 @@ from utils.blast import primer_blast_url_pair, primer_blast_url_single
 
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from ui.footer import add_footer
+from pathlib import Path
+import streamlit as st
+
+ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
+SPLICING_IMG = ASSETS_DIR / "splicing_examples.png"
+
 
 
 import streamlit as st
