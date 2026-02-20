@@ -8,7 +8,10 @@ from utils.blast import primer_blast_url_pair
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from ui.footer import add_footer
 
-
+def render():
+    import streamlit as st
+    st.write("qPCR tab loaded")
+    
 def render():
     st.title("qPCR primers")
 
