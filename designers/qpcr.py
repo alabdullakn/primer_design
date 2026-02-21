@@ -1,7 +1,7 @@
 # designers/qpcr.py
 import streamlit as st
 
-from primer_engine import (
+from qpcr_primer_engine import (
     design_qpcr_junction_pair,
     qpcr_amplicon_size_from_hits,
 )
