@@ -377,9 +377,6 @@ def print_dimer_report_pair(fwd_seq: str, rev_seq: str) -> None:
         "Heuristic dimer risk (REV->FWD) %": round(risk_rev_to_fwd, 1),
     }])
 
-"Heuristic dimer risk (REV->FWD) %": round(risk_rev_to_fwd, 1),
-}])
-
 
 # ---------------- qPCR junction helpers ----------------
 
