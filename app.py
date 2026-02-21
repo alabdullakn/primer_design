@@ -17,5 +17,4 @@ with tabs[0]:
 with tabs[1]:
     render_splicing()
 with tabs[2]:
-    st.write("Entered qPCR tab")
     render_qpcr()
