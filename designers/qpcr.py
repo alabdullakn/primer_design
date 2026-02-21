@@ -1,5 +1,6 @@
 # designers/qpcr.py
 import streamlit as st
+import qpcr_engine as st
 
 from qpcr_engine import (
    design_qpcr_junction_pair,
