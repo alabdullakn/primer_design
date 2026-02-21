@@ -1,1 +1,3 @@
-git show cc3a1d6:designers/qpcr.py
+git fetch origin
+git cherry-pick cc3a1d6
+git push origin <your-branch>
