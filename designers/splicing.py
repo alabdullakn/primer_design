@@ -101,8 +101,7 @@ def render():
 
     if missing:
         st.error("Missing: " + ", ".join(missing))
-        st.stop()
-
+        return
     st.markdown("---")
 
     run = st.button("Design primers", key="splicing_design_btn")
