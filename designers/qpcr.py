@@ -1,10 +1,8 @@
 # designers/qpcr.py
 import streamlit as st
-import qpcr_engine as st
 
 from qpcr_engine import (
-   design_qpcr_junction_pair,
-   qpcr_amplicon_size_from_hits,
+   amplicon_size_from_hits,
 )
 
 def render():
@@ -83,7 +81,7 @@ def render():
                dimer_k=dimer_k,
            )
 
-           amp_size = qpcr_amplicon_size_from_hits(fwd, rev)
+           amp_size = amplicon_size_from_hits(fwd, rev)
 
            st.success("Designed primers")
            st.write(f"Amplicon size bp: {amp_size}")
