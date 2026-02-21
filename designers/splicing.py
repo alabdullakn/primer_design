@@ -62,11 +62,11 @@ def render():
 
     if len(selected_pairs) == 0:
         st.error("Please select at least one primer pair.")
-        st.stop()
+        return
 
     if len(selected_pairs) > 2:
         st.error("Maximum 2 primer pairs allowed.")
-        st.stop()
+        return
 
     needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
     needs_fwd_b = any(p.startswith("FWD B") for p in selected_pairs)
