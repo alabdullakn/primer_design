@@ -19,8 +19,7 @@ with tabs[2]:
         from designers.qpcr import render as render_qpcr
 
         render_qpcr()
-    except Exception as e:
-        render_qpcr()
+
     except Exception as e:
         st.error("qPCR tab crashed during import or rendering.")
         st.exception(e)
