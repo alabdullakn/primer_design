@@ -18,5 +18,9 @@ with tabs[0]:
 with tabs[1]:
     render_splicing()
 with tabs[2]:
-    st.write("Entered qPCR tab")
-    render_qpcr()
+    try:
+        render_qpcr()
+    except Exception as e:
+        import streamlit as st
+        st.error("qPCR tab crashed.")
+        st.exception(e)
