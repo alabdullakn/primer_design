@@ -10,16 +10,17 @@ st.set_page_config(page_title="Primer Designer", layout="wide")
 apply_styles()
 
 tabs = st.tabs(["Regular PCR", "Splicing primers", "qPCR primers"])
+
 with tabs[0]:
     render_regular()
+
 with tabs[1]:
     render_splicing()
+
 with tabs[2]:
     try:
         from designers.qpcr import render as render_qpcr
-
         render_qpcr()
-
     except Exception as e:
         st.error("qPCR tab crashed during import or rendering.")
         st.exception(e)
