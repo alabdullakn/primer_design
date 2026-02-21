@@ -1,3 +1,4 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/qpcr_engine.py b/qpcr_engine.py
 index 851554e2e489d7c55f832eeaad825e0bebd3091e..9085496e12bbf5088ffb5a77b6c37fb3aabbd239 100644
 --- a/qpcr_engine.py
@@ -157,3 +158,6 @@ index 851554e2e489d7c55f832eeaad825e0bebd3091e..9085496e12bbf5088ffb5a77b6c37fb3
 +       )
  
     return best_fwd, best_rev, probe
+ 
+EOF
+)
