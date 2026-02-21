@@ -1,6 +1,5 @@
 # designers/qpcr.py
 import streamlit as st
-import primer_engine as st
 
 from primer_engine import (
     clean_seq,
