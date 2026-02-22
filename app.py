@@ -47,7 +47,7 @@ st.markdown(
         white-space: nowrap;
     }
 
-    div[role="radiogroup"] > label[data-selected="true"] {
+    div[role="radiogroup"] > label:has(input:checked) {
         border-color: #7dd3fc;
         background: linear-gradient(180deg, rgba(37, 99, 235, 0.96), rgba(30, 64, 175, 0.96));
         box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
