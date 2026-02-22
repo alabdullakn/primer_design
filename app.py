@@ -19,6 +19,7 @@ st.markdown(
     div[role="radiogroup"] {
         display: grid !important;
         grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-auto-rows: 56px;
         gap: 0.55rem;
         width: 100%;
     }
@@ -26,13 +27,16 @@ st.markdown(
 
     div[role="radiogroup"] > label {
         width: 100%;
+        height: 56px;
         margin: 0;
         display: flex;
+        align-items: center;
         justify-content: center;
         background: rgba(15, 23, 42, 0.82);
         border: 1px solid rgba(148, 163, 184, 0.35);
         border-radius: 10px;
         padding: 0.3rem 0.35rem;
+        box-sizing: border-box;
     }
 
 
