@@ -10,20 +10,31 @@ from designers.home import render as render_home
 st.set_page_config(page_title="Qprimer", layout="wide")
 apply_styles()
 
-tabs = st.tabs(["Home", "Regular PCR", "Splicing primers", "qPCR primers"])
+TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers"]
+if "active_tab" not in st.session_state:
+    st.session_state["active_tab"] = "Home"
 
-with tabs[0]:
+if "requested_tab" in st.session_state:
+    st.session_state["active_tab"] = st.session_state.pop("requested_tab")
+
+st.radio(
+    "Navigation",
+    TAB_OPTIONS,
+    key="active_tab",
+    horizontal=True,
+    label_visibility="collapsed",
+)
+
+if st.session_state["active_tab"] == "Home":
     render_home()
-
-with tabs[1]:
+elif st.session_state["active_tab"] == "Regular PCR":
     render_regular()
-
-with tabs[2]:
+elif st.session_state["active_tab"] == "Splicing primers":
     render_splicing()
-
-with tabs[3]:
+else:
     try:
         from designers.qpcr import render as render_qpcr
+
         render_qpcr()
     except Exception as e:
         st.error("qPCR tab crashed during import or rendering.")
