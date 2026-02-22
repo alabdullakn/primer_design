@@ -10,8 +10,8 @@ from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from utils.blast import primer_blast_url_pair, primer_blast_url_single
 
 def render():
-    st.header("qPCR primer designer")
-
+    st.title("qPCR primers")
+    
     st.write("Paste your sequence and mark the exon-exon junction with ^")
     st.write("Example: ...ACCTG^GTTCA...")
 
