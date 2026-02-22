@@ -18,6 +18,7 @@ def render():
     st.subheader("Examples")
     if SPLICING_IMG.exists():
         st.image(str(SPLICING_IMG), use_container_width=True)
+  
     else:
         st.info("Image not found: assets/splicing_examples.png")
 
@@ -42,6 +43,16 @@ def render():
             tm_tol = st.number_input(
                 "Tm tolerance (± °C)", 1.0, 20.0, 5.0, key="splicing_tm_tol"
             )
+
+        st.markdown("---")
+        st.caption("Reaction chemistry (used for Tm correction)")
+        c3, c4, c5 = st.columns(3)
+        with c3:
+            sodium_mM = st.number_input("Monovalent salt [Na+] mM", 1.0, 500.0, 50.0, key="splicing_na_mM")
+        with c4:
+            mg_mM = st.number_input("Mg²⁺ concentration mM", 0.0, 20.0, 1.5, key="splicing_mg_mM")
+        with c5:
+            dntp_mM = st.number_input("Total dNTP mM", 0.0, 10.0, 0.2, key="splicing_dntp_mM")
 
     st.subheader("Choose which primer pairs to generate (max 2)")
 
@@ -68,39 +79,7 @@ def render():
         st.error("Maximum 2 primer pairs allowed.")
         return
 
-    needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
-    needs_fwd_b = any(p.startswith("FWD B") for p in selected_pairs)
-    needs_rev_a = any(p.endswith("REV A") for p in selected_pairs)
-    needs_rev_b = any(p.endswith("REV B") for p in selected_pairs)
-
-    st.subheader("Paste sequences (A/C/G/T only)")
-
-    exon_fwd_a = ""
-    exon_fwd_b = ""
-    exon_rev_a = ""
-    exon_rev_b = ""
-
-    if needs_fwd_a:
-        exon_fwd_a = st.text_area("Forward A sequence", height=140, key="splicing_fwd_a")
-    if needs_fwd_b:
-        exon_fwd_b = st.text_area("Forward B sequence", height=140, key="splicing_fwd_b")
-    if needs_rev_a:
-        exon_rev_a = st.text_area("Reverse A sequence", height=140, key="splicing_rev_a")
-    if needs_rev_b:
-        exon_rev_b = st.text_area("Reverse B sequence", height=140, key="splicing_rev_b")
-
-    missing = []
-    if needs_fwd_a and not exon_fwd_a.strip():
-        missing.append("Forward A")
-    if needs_fwd_b and not exon_fwd_b.strip():
-        missing.append("Forward B")
-    if needs_rev_a and not exon_rev_a.strip():
-        missing.append("Reverse A")
-    if needs_rev_b and not exon_rev_b.strip():
-        missing.append("Reverse B")
-
-    if missing:
-        st.error("Missing: " + ", ".join(missing))
+@@ -104,63 +114,69 @@ def render():
         return
     st.markdown("---")
 
@@ -126,6 +105,9 @@ def render():
                 tm_target=float(tm_target),
                 tm_tol=float(tm_tol),
                 dimer_k=int(dimer_k),
+                sodium_mM=float(sodium_mM),
+                mg_mM=float(mg_mM),
+                dntp_mM=float(dntp_mM),
             )
             res_A = (p1A, p2A, p3A)
 
@@ -139,9 +121,11 @@ def render():
                 tm_target=float(tm_target),
                 tm_tol=float(tm_tol),
                 dimer_k=int(dimer_k),
+                sodium_mM=float(sodium_mM),
+                mg_mM=float(mg_mM),
+                dntp_mM=float(dntp_mM),
             )
             res_B = (p1B, p2B, p3B)
-
         st.success("Primers designed successfully.")
         st.caption(SCORE_EXPLANATION)
 
