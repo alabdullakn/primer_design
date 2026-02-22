@@ -60,6 +60,26 @@ def render():
             line-height: 1.35;
             margin-top: 0.65rem;
         }}
+        /* Keep top navigation tabs visually identical to the other pages. */
+        div[role="radiogroup"] > label {{
+            background: rgba(15, 23, 42, 0.82) !important;
+            border: 1px solid rgba(148, 163, 184, 0.35) !important;
+            border-radius: 10px !important;
+            padding: 0.3rem 0.35rem !important;
+        }}
+
+        div[role="radiogroup"] > label p {{
+            color: #e2e8f0 !important;
+            font-weight: 700 !important;
+            font-size: 1.02rem !important;
+        }}
+
+        div[role="radiogroup"] > label[data-selected="true"] {{
+            border-color: #7dd3fc !important;
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.96), rgba(30, 64, 175, 0.96)) !important;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35) !important;
+        }}
+
 
         div[data-testid="stButton"] > button {{
             min-height: 150px;
