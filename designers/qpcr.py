@@ -1,11 +1,12 @@
 # designers/qpcr.py
 import streamlit as st
+import pandas as pd
 
 from qpcr_engine import (
     amplicon_size_from_hits,
     design_qpcr_junction_pair,
 )
-from ui.text import BLAST_INSTRUCTIONS
+from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from utils.blast import primer_blast_url_pair, primer_blast_url_single
 
 def render():
@@ -137,7 +138,7 @@ def render():
 
             st.success("Designed qPCR primers")
             st.write(f"Chemistry: {chemistry_label}")
-             st.caption(getattr(ui_text, "SCORE_EXPLANATION", "Score (lower is better): internal ranking only."))
+            st.caption(SCORE_EXPLANATION)
 
             rows = [
                 {
@@ -161,21 +162,9 @@ def render():
                     "Role": rev.role,
                 },
             ]
-            st.subheader("Primer-BLAST links (NCBI)")
-            organism = "Homo sapiens"
-            pair_url = primer_blast_url_pair(fwd.seq_5to3, rev.seq_5to3, organism)
-            st.markdown(f"**qPCR pair**: [Open in Primer-BLAST]({pair_url})")
-
-            with st.expander("Single-primer Primer-BLAST links"):
-                st.markdown(
-                    f"**Forward primer**: [Primer-BLAST]({primer_blast_url_single(fwd.seq_5to3, organism)})"
-                )
-                st.markdown(
-                    f"**Reverse primer**: [Primer-BLAST]({primer_blast_url_single(rev.seq_5to3, organism)})"
-                )
-
+            
             if probe is not None:
-              rows.append(
+               rows.append(
                     {
                         "Type": "PROBE",
                         "Primer (5'→3')": probe.seq_5to3,
