@@ -137,16 +137,30 @@ def render():
 
             st.success("Designed qPCR primers")
             st.write(f"Chemistry: {chemistry_label}")
-            st.write(f"Amplicon size bp: {amp_size}")
+            st.caption(SCORE_EXPLANATION)
 
-            st.markdown("Forward primer 5 to 3")
-            st.code(fwd.seq_5to3)
-            st.write(f"Tm {fwd.tm_c:.1f} C, GC {fwd.gc_pct:.1f} percent")
-
-            st.markdown("Reverse primer 5 to 3")
-            st.code(rev.seq_5to3)
-            st.write(f"Tm {rev.tm_c:.1f} C, GC {rev.gc_pct:.1f} percent")
-            
+            rows = [
+                {
+                    "Type": "FWD",
+                    "Primer (5'→3')": fwd.seq_5to3,
+                    "Length": fwd.length,
+                    "Tm (°C)": round(fwd.tm_c, 1),
+                    "GC (%)": round(fwd.gc_pct, 1),
+                    "Score": round(fwd.score, 2),
+                    "Start (0-based)": fwd.start_0based,
+                    "Role": fwd.role,
+                },
+                {
+                    "Type": "REV",
+                    "Primer (5'→3')": rev.seq_5to3,
+                    "Length": rev.length,
+                    "Tm (°C)": round(rev.tm_c, 1),
+                    "GC (%)": round(rev.gc_pct, 1),
+                    "Score": round(rev.score, 2),
+                    "Start (0-based)": rev.start_0based,
+                    "Role": rev.role,
+                },
+            ]
             st.subheader("Primer-BLAST links (NCBI)")
             organism = "Homo sapiens"
             pair_url = primer_blast_url_pair(fwd.seq_5to3, rev.seq_5to3, organism)
@@ -161,15 +175,40 @@ def render():
                 )
 
             if probe is not None:
-                st.markdown("TaqMan probe 5 to 3")
-                st.code(probe.seq_5to3)
-                st.write(f"Tm {probe.tm_c:.1f} C, GC {probe.gc_pct:.1f} percent")
-                st.markdown(
-                    f"**Probe**: [Primer-BLAST]({primer_blast_url_single(probe.seq_5to3, organism)})"
+              rows.append(
+                    {
+                        "Type": "PROBE",
+                        "Primer (5'→3')": probe.seq_5to3,
+                        "Length": probe.length,
+                        "Tm (°C)": round(probe.tm_c, 1),
+                        "GC (%)": round(probe.gc_pct, 1),
+                        "Score": round(probe.score, 2),
+                        "Start (0-based)": probe.start_0based,
+                        "Role": "Internal probe",
+                    }
                 )
 
-            st.info(BLAST_INSTRUCTIONS)
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+            st.write(f"Estimated amplicon length: **{amp_size} bp**")
 
+            st.subheader("Primer-BLAST links (NCBI)")
+            organism = "Homo sapiens"
+            pair_url = primer_blast_url_pair(fwd.seq_5to3, rev.seq_5to3, organism)
+            st.markdown(f"**qPCR pair**: [Open in Primer-BLAST]({pair_url})")
+
+            with st.expander("Single-primer Primer-BLAST links"):
+                st.markdown(
+                    f"**Forward primer**: [Primer-BLAST]({primer_blast_url_single(fwd.seq_5to3, organism)})"
+                )
+                st.markdown(
+                    f"**Reverse primer**: [Primer-BLAST]({primer_blast_url_single(rev.seq_5to3, organism)})"
+                )
+                if probe is not None:
+                    st.markdown(
+                        f"**Probe**: [Primer-BLAST]({primer_blast_url_single(probe.seq_5to3, organism)})"
+                    )
+
+            st.info(BLAST_INSTRUCTIONS)
         except Exception as e:
             st.error(f"qPCR design failed: {e}")
             st.info("Try widening Tm tolerance/GC range, relaxing strict junction distance, or increasing amplicon max")
