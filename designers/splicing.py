@@ -78,7 +78,7 @@ def render():
         st.error("Maximum 2 primer pairs allowed.")
         return
 
- needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
+    needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
     needs_fwd_b = any(p.startswith("FWD B") for p in selected_pairs)
     needs_rev_a = any(p.endswith("REV A") for p in selected_pairs)
     needs_rev_b = any(p.endswith("REV B") for p in selected_pairs)
