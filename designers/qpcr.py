@@ -103,7 +103,7 @@ def render():
 
     st.divider()
 
-    if st.button("Design qPCR assay"):
+    if st.button("Design qPCR primers"):
         try:
             if not seq or "^" not in seq:
                 st.error("Your sequence must include the junction marker ^")
@@ -134,7 +134,7 @@ def render():
 
             amp_size = amplicon_size_from_hits(fwd, rev)
 
-            st.success("Designed qPCR assay")
+            st.success("Designed qPCR primers")
             st.write(f"Chemistry: {chemistry_label}")
             st.write(f"Amplicon size bp: {amp_size}")
 
