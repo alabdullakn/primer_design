@@ -98,7 +98,7 @@ def render():
         with p4:
             probe_max_len = st.slider("Probe max length", 18, 35, 30, 1)
 
-if junction_3p_max_distance < j_ov:
+    if junction_3p_max_distance < j_ov:
         st.warning("Current settings are contradictory: max 3' distance must be at least min overlap each side.")
 
     st.divider()
