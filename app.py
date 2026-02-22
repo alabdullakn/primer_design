@@ -90,3 +90,5 @@ elif st.session_state["active_tab"] == "qPCR primers":
         st.exception(e)
 else:
     render_about()
+
+add_footer()
