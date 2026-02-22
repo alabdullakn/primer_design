@@ -62,14 +62,14 @@ def render():
         }}
 
         div[data-testid="stButton"] > button {{
-            min-height: 90px;
+            min-height: 100px;
             border-radius: 14px;
-            font-size: 3rem;
+            font-size: 3.4rem;
             font-weight: 900;
-            border: 1px solid rgba(103, 232, 249, 0.95);
-            background: linear-gradient(180deg, #0f766e 0%, #115e59 100%);
-            color: #ecfeff;
-            box-shadow: 0 10px 24px rgba(15, 118, 110, 0.35);
+            border: 1px solid rgba(148, 163, 184, 0.42);
+            background: linear-gradient(180deg, rgba(30, 41, 80, 0.98) 0%, rgba(23, 32, 63, 0.98) 100%);
+            color: #f8fafc;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.42);
             line-height: 1.05;
             white-space: nowrap;
             text-wrap: balance;
@@ -79,13 +79,13 @@ def render():
             margin: 0;
             line-height: 1.05;
             font-weight: 900;
-            font-size: 0.62em;
+            font-size: 0.72em;
             letter-spacing: 0.01em;
         }}
 
         div[data-testid="stButton"] > button:hover {{
-            border-color: #a5f3fc;
-            background: linear-gradient(180deg, #0f766e 0%, #0f766e 100%);
+            border-color: #60a5fa;
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.92) 0%, rgba(30, 64, 175, 0.92) 100%);
             color: #ffffff;
         }}
         </style>
