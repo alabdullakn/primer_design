@@ -21,7 +21,7 @@ def render():
         placeholder="Paste DNA sequence here with ^ at the junction",
     )
 
-      with st.expander("Primer parameters", expanded=False):
+    with st.expander("Primer parameters", expanded=False):
         c1, c2, c3 = st.columns(3)
         with c1:
             chemistry_label = st.selectbox(
@@ -102,7 +102,7 @@ def render():
                 seq_with_junction_marker=seq,
                 chemistry=chemistry,
                 junction_primer=junction_primer,
-              min_len=int(min_len),
+                min_len=int(min_len),
                 max_len=int(max_len),
                 primer_tm_target=float(tm_target),
                 primer_tm_tol=float(tm_tol),
