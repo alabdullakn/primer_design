@@ -76,7 +76,7 @@ def render():
             "Max distance of junction from 3' end (strict)",
             1,
             10,
-            4,
+            8,
             1,
             help="Smaller values are stricter and force the junction to be closer to the primer 3' end.",
         )
@@ -97,6 +97,9 @@ def render():
             probe_min_len = st.slider("Probe min length", 16, 28, 18, 1)
         with p4:
             probe_max_len = st.slider("Probe max length", 18, 35, 30, 1)
+
+if junction_3p_max_distance < j_ov:
+        st.warning("Current settings are contradictory: max 3' distance must be at least min overlap each side.")
 
     st.divider()
 
