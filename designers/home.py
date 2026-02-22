@@ -58,28 +58,28 @@ def render():
             color: #dbeafe;
             font-size: 1.02rem;
             line-height: 1.35;
-            margin-top: 0.45rem;
+            margin-top: 0.65rem;
         }}
 
         div[data-testid="stButton"] > button {{
-            min-height: 100px;
+            min-height: 150px;
             border-radius: 14px;
-            font-size: 3.4rem;
+            font-size: 2rem;
             font-weight: 900;
             border: 1px solid rgba(148, 163, 184, 0.42);
             background: linear-gradient(180deg, rgba(30, 41, 80, 0.98) 0%, rgba(23, 32, 63, 0.98) 100%);
             color: #f8fafc;
             box-shadow: 0 10px 24px rgba(15, 23, 42, 0.42);
-            line-height: 1.05;
+            line-height: 1.15;
             white-space: nowrap;
             text-wrap: balance;
         }}
 
         div[data-testid="stButton"] > button p {{
             margin: 0;
-            line-height: 1.05;
+            line-height: 1.15;
             font-weight: 900;
-            font-size: 0.72em;
+            font-size: 1.75rem;
             letter-spacing: 0.01em;
         }}
 
