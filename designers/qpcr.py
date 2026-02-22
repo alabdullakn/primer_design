@@ -10,7 +10,7 @@ from qpcr_engine import (
 def render():
     st.header("qPCR primer designer")
 
-    st.write("Paste your spliced sequence and mark the exon-exon junction with ^")
+    st.write("Paste your sequence and mark the exon-exon junction with ^")
     st.write("Example: ...ACCTG^GTTCA...")
 
     seq = st.text_area(
