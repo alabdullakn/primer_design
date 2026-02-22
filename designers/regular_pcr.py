@@ -88,7 +88,7 @@ def render():
                 key="reg_end_window_ui",
             )
 
-    st.markdown("---")
+    
 
     # ============================
     # Sequence input
