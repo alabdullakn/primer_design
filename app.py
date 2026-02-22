@@ -28,4 +28,3 @@ with tabs[3]:
     except Exception as e:
         st.error("qPCR tab crashed during import or rendering.")
         st.exception(e)
-designers/home.py
