@@ -6,6 +6,7 @@ import streamlit as st
 from designers.regular_pcr import render as render_regular
 from designers.splicing import render as render_splicing
 from designers.home import render as render_home
+from designers.about import render as render_about
 
 st.set_page_config(page_title="Qprimer", layout="wide")
 apply_styles()
@@ -16,7 +17,7 @@ st.markdown(
     /* Equal-size top navigation tabs */
     div[role="radiogroup"] {
         display: grid !important;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 0.55rem;
         width: 100%;
     }
@@ -57,7 +58,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers"]
+TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers", "About us"]]
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Home"
 
@@ -79,7 +80,7 @@ elif st.session_state["active_tab"] == "Regular PCR":
     render_regular()
 elif st.session_state["active_tab"] == "Splicing primers":
     render_splicing()
-else:
+elif st.session_state["active_tab"] == "qPCR primers":
     try:
         from designers.qpcr import render as render_qpcr
 
@@ -87,3 +88,5 @@ else:
     except Exception as e:
         st.error("qPCR tab crashed during import or rendering.")
         st.exception(e)
+else:
+    render_about()
