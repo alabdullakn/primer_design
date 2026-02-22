@@ -49,14 +49,14 @@ def render():
         .hero-sub {{
             text-align: center;
             color: #dbeafe;
-            font-size: 1.14rem;
+            font-size: 1.0rem;
             margin-bottom: 1.25rem;
         }}
 
         .workflow-note {{
             text-align: center;
             color: #dbeafe;
-            font-size: 1.02rem;
+            font-size: 0.96rem;
             line-height: 1.35;
             margin-top: 0.65rem;
         }}
@@ -82,9 +82,9 @@ def render():
 
 
         div[data-testid="stButton"] > button {{
-            min-height: 150px;
+            min-height: 120px;
             border-radius: 14px;
-            font-size: 2rem;
+            font-size: 1.35rem;
             font-weight: 900;
             border: 1px solid rgba(148, 163, 184, 0.42);
             background: linear-gradient(180deg, rgba(30, 41, 80, 0.98) 0%, rgba(23, 32, 63, 0.98) 100%);
@@ -99,7 +99,7 @@ def render():
             margin: 0;
             line-height: 1.15;
             font-weight: 900;
-            font-size: 1.75rem;
+            font-size: 1.2rem;
             letter-spacing: 0.01em;
         }}
 
