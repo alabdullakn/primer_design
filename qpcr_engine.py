@@ -61,12 +61,13 @@ def max_run(seq: str) -> int:
    return best
 
 
-def self_complementarity_flag(seq: str) -> bool:
-   rc = revcomp(seq)
-   for i in range(len(seq) - 3):
-       if seq[i:i + 4] in rc:
-           return True
-   return False
+def self_complementarity_flag(seq: str, k: int = 4) -> bool:
+   if len(seq) < k:
+       return False
+   # Keep this check focused on problematic 3' complementarity instead of
+   # rejecting candidates for any short internal inverted repeat.
+   seed = seq[-k:]
+   return revcomp(seed) in seq[:-1]
 
 
 def has_3prime_complementarity(p1: str, p2: str, k: int = 4) -> bool:
@@ -136,15 +137,18 @@ def _find_partner_reverse(
    amplicon_max: int,
    dimer_k: int,
 ) -> Optional[PrimerHit]:
-   fwd_3p = fwd.start_0based + fwd.length
-   search_start = fwd_3p + amplicon_min - 1
-   search_end = min(len(template), fwd_3p + amplicon_max)
-   if search_start >= search_end:
-       return None
-
+   
    best = None
    for L in range(min_len, max_len + 1):
-       for i in range(search_start, search_end - L + 1):
+       # amplicon_size = (rev_start + rev_len) - fwd_start
+       i_min = fwd.start_0based + amplicon_min - L
+       i_max = fwd.start_0based + amplicon_max - L
+       search_start = max(0, i_min)
+       search_end = min(len(template) - L, i_max)
+       if search_start > search_end:
+           continue
+
+       for i in range(search_start, search_end + 1):
            bind_site = template[i:i + L]
            rev_seq = revcomp(bind_site)
 
@@ -198,7 +202,15 @@ def _find_partner_forward(
 
    best = None
    for L in range(min_len, max_len + 1):
-       for i in range(search_start, search_end - L + 1):
+        # amplicon_size = (rev_start + rev_len) - fwd_start
+       i_min = rev.start_0based + rev.length - amplicon_max
+       i_max = rev.start_0based + rev.length - amplicon_min
+       search_start = max(0, i_min)
+       search_end = min(len(template) - L, i_max)
+       if search_start > search_end:
+           continue
+
+       for i in range(search_start, search_end + 1):
            fwd_seq = template[i:i + L]
 
            scored = _qpcr_score_candidate(
