@@ -143,7 +143,6 @@ def render():
         add_footer()
         return
 
-    st.markdown("---")
 
     run = st.button("Design primers", key="reg_run")
     if not run:
