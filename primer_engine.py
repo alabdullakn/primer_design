@@ -280,7 +280,7 @@ def design_exon_primers(
     mg_mM: float = 1.5,
     dntp_mM: float = 0.2,
 ) -> Tuple[PrimerHit, PrimerHit, PrimerHit]:
-     fwd1 = best_primer_from_exon(
+    fwd1 = best_primer_from_exon(
         exon1,
         "Exon1",
         "FWD",
