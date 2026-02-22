@@ -58,7 +58,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers", "About us"]]
+TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers", "About us"]
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Home"
 
