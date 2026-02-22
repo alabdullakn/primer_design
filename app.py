@@ -21,6 +21,7 @@ st.markdown(
         width: 100%;
     }
 
+
     div[role="radiogroup"] > label {
         width: 100%;
         margin: 0;
@@ -29,8 +30,9 @@ st.markdown(
         background: rgba(15, 23, 42, 0.82);
         border: 1px solid rgba(148, 163, 184, 0.35);
         border-radius: 10px;
-        padding: 0.45rem 0.4rem;
+        padding: 0.3rem 0.35rem;
     }
+
 
     div[role="radiogroup"] > label > div:first-child {
         display: none;
@@ -39,9 +41,10 @@ st.markdown(
     div[role="radiogroup"] > label p {
         color: #e2e8f0;
         font-weight: 700;
-        font-size: 1.28rem;
+        font-size: 1.02rem;
         text-align: center;
         margin: 0;
+        white-space: nowrap;
     }
 
     div[role="radiogroup"] > label[data-selected="true"] {
@@ -57,6 +60,7 @@ st.markdown(
 TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers"]
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Home"
+
 
 if "requested_tab" in st.session_state:
     st.session_state["active_tab"] = st.session_state.pop("requested_tab")
