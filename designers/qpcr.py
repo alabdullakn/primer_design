@@ -137,7 +137,7 @@ def render():
 
             st.success("Designed qPCR primers")
             st.write(f"Chemistry: {chemistry_label}")
-            st.caption(SCORE_EXPLANATION)
+             st.caption(getattr(ui_text, "SCORE_EXPLANATION", "Score (lower is better): internal ranking only."))
 
             rows = [
                 {
