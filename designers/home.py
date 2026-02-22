@@ -115,7 +115,8 @@ def render():
 
     st.markdown('<div class="hero-title">QPrimer</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="hero-sub">Choose one workflow below and jump directly into design.</div>',
+        '<div class="hero-sub">Welcome to QPrimer, the easiest website to design your primers.
+        To continue pick one of the options below.</div>',
         unsafe_allow_html=True,
     )
 
