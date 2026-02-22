@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import requests
 
-from primer_engine import design_basic_pcr_primers, print_dimer_report_pair
+from primer_engine import design_basic_pcr_primers, print_dimer_report_pair, tm_with_buffer
 from utils.blast import primer_blast_url_pair
-from utils.primer_utils import gc_pct, tm_wallace, primer_score
+from utils.primer_utils import gc_pct, primer_score
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from ui.footer import add_footer
 
@@ -87,6 +87,16 @@ def render():
                 step=50,
                 key="reg_end_window_ui",
             )
+        st.markdown("---")
+        st.caption("Reaction chemistry (used for Tm correction)")
+        c5, c6, c7 = st.columns(3)
+        with c5:
+            sodium_mM = st.number_input("Monovalent salt [Na+] mM", 1.0, 500.0, 50.0, key="reg_na_mM")
+        with c6:
+            mg_mM = st.number_input("Mg²⁺ concentration mM", 0.0, 20.0, 1.5, key="reg_mg_mM")
+        with c7:
+            dntp_mM = st.number_input("Total dNTP mM", 0.0, 10.0, 0.2, key="reg_dntp_mM")
+
 
     
 
@@ -183,6 +193,9 @@ def render():
             end_window=int(end_window),
             amplicon_min=int(amp_min),
             amplicon_max=int(amp_max),
+            sodium_mM=float(sodium_mM),
+            mg_mM=float(mg_mM),
+            dntp_mM=float(dntp_mM),
         )
 
         st.success("Primers designed successfully.")
@@ -193,7 +206,7 @@ def render():
                 "Type": "FWD",
                 "Primer (5'→3')": fwd,
                 "Length": len(fwd),
-                "Tm (°C)": round(tm_wallace(fwd), 1),
+                 "Tm (°C)": round(tm_with_buffer(fwd, sodium_mM=float(sodium_mM), mg_mM=float(mg_mM), dntp_mM=float(dntp_mM)), 1),
                 "GC (%)": round(gc_pct(fwd), 1),
                 "Score": round(primer_score(fwd, float(tm_target)), 2),
                 "Start (0-based)": fwd_start,
@@ -202,7 +215,7 @@ def render():
                 "Type": "REV",
                 "Primer (5'→3')": rev,
                 "Length": len(rev),
-                "Tm (°C)": round(tm_wallace(rev), 1),
+                "Tm (°C)": round(tm_with_buffer(rev, sodium_mM=float(sodium_mM), mg_mM=float(mg_mM), dntp_mM=float(dntp_mM)), 1),
                 "GC (%)": round(gc_pct(rev), 1),
                 "Score": round(primer_score(rev, float(tm_target)), 2),
                 "Bind start (0-based)": rev_bind_start,
