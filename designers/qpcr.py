@@ -14,7 +14,7 @@ def render():
     st.write("Example: ...ACCTG^GTTCA...")
 
     seq = st.text_area(
-        "Spliced sequence with junction marker ^",
+        "Sequence with junction marker ^",
         height=180,
         placeholder="Paste DNA sequence here with ^ at the junction",
     )
