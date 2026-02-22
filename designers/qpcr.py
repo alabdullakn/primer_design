@@ -12,15 +12,6 @@ from utils.blast import primer_blast_url_pair, primer_blast_url_single
 def render():
     st.title("qPCR primers")
     
-    st.write("Paste your sequence and mark the exon-exon junction with ^")
-    st.write("Example: ...ACCTG^GTTCA...")
-
-    seq = st.text_area(
-        "Sequence with junction marker ^",
-        height=180,
-        placeholder="Paste DNA sequence here with ^ at the junction",
-    )
-
     with st.expander("Primer parameters", expanded=False):
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -87,6 +78,16 @@ def render():
                 probe_tm_tol = st.number_input("Probe Tm tolerance", 0.5, 8.0, 3.0, key="qpcr_probe_tm_tol")
                 probe_max_len = st.number_input("Probe max length", 18, 35, 30, key="qpcr_probe_max_len")
 
+    st.write("Paste your sequence and mark the exon-exon junction with ^")
+    st.write("Example: ...ACCTG^GTTCA...")
+
+    seq = st.text_area(
+        "Sequence with junction marker ^",
+        height=180,
+        placeholder="Paste DNA sequence here with ^ at the junction",
+    )
+
+    with st.expander("Primer parameters", expanded=False):
     if junction_3p_max_distance < j_ov:
         st.warning("Current settings are contradictory: max 3' distance must be at least min overlap each side.")
 
