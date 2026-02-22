@@ -134,7 +134,7 @@ def render():
 
     with c3:
         go_qpcr = st.button("qPCR primers", key="home_qpcr", width="stretch")
-        st.markdown('<div class="workflow-note">Generate qPCR-friendly primer candidates.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="workflow-note">Generate qPCR primer candidates.</div>', unsafe_allow_html=True)
 
     if go_regular:
         st.session_state["requested_tab"] = "Regular PCR"
