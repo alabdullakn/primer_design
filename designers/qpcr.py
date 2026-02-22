@@ -87,7 +87,6 @@ def render():
         placeholder="Paste DNA sequence here with ^ at the junction",
     )
 
-    with st.expander("Primer parameters", expanded=False):
     if junction_3p_max_distance < j_ov:
         st.warning("Current settings are contradictory: max 3' distance must be at least min overlap each side.")
 
