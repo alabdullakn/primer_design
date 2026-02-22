@@ -13,33 +13,41 @@ apply_styles()
 st.markdown(
     """
     <style>
-    /* Turn radio into tab-like pills and hide circle indicators */
+    /* Equal-size top navigation tabs */
     div[role="radiogroup"] {
-        gap: 0.5rem;
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.55rem;
+        width: 100%;
     }
 
-
-    div[role="radiogroup"] label {
-        background: rgba(15, 23, 42, 0.85);
+    div[role="radiogroup"] > label {
+        width: 100%;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.82);
         border: 1px solid rgba(148, 163, 184, 0.35);
         border-radius: 10px;
-        padding: 0.35rem 0.8rem;
+        padding: 0.45rem 0.4rem;
     }
 
-
-    div[role="radiogroup"] label > div:first-child {
+    div[role="radiogroup"] > label > div:first-child {
         display: none;
     }
 
-    div[role="radiogroup"] label p {
+    div[role="radiogroup"] > label p {
         color: #e2e8f0;
-        font-weight: 600;
+        font-weight: 700;
+        font-size: 1.28rem;
+        text-align: center;
         margin: 0;
     }
 
-    div[role="radiogroup"] label[data-selected="true"] {
-        border-color: #60a5fa;
-        background: linear-gradient(180deg, rgba(30, 64, 175, 0.95), rgba(29, 78, 216, 0.95));
+    div[role="radiogroup"] > label[data-selected="true"] {
+        border-color: #7dd3fc;
+        background: linear-gradient(180deg, rgba(37, 99, 235, 0.96), rgba(30, 64, 175, 0.96));
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
     }
     </style>
     """,
