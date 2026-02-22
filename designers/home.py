@@ -102,8 +102,11 @@ def render():
         go_qpcr = st.button("Open qPCR Primers", key="home_qpcr", width="stretch")
 
     if go_regular:
-        st.success("Go to the **Regular PCR** tab above to continue.")
+        st.session_state["requested_tab"] = "Regular PCR"
+        st.rerun()
     if go_splicing:
-        st.success("Go to the **Splicing primers** tab above to continue.")
+        st.session_state["requested_tab"] = "Splicing primers"
+        st.rerun()
     if go_qpcr:
-        st.success("Go to the **qPCR primers** tab above to continue.")
+        st.session_state["requested_tab"] = "qPCR primers"
+        st.rerun()
