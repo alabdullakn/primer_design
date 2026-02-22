@@ -7,6 +7,7 @@
 # - Streamlit dimer reports
 
 from dataclasses import dataclass
+import math
 from typing import List, Tuple, Optional
 
 DNA = set("ACGT")
@@ -63,6 +64,24 @@ def gc_content(seq: str) -> float:
 def tm_wallace(seq: str) -> float:
     return 2.0 * (seq.count("A") + seq.count("T")) + 4.0 * (seq.count("G") + seq.count("C"))
 
+def tm_with_buffer(
+    seq: str,
+    sodium_mM: float = 50.0,
+    mg_mM: float = 1.5,
+    dntp_mM: float = 0.2,
+) -> float:
+    """
+    Wallace Tm with a basic ionic-strength correction.
+    Na_eq uses a common approximation: [Na+] + 120*sqrt(max([Mg2+] - [dNTP], 0)).
+    """
+    base_tm = tm_wallace(seq)
+
+    free_mg = max(float(mg_mM) - float(dntp_mM), 0.0)
+    na_eq_mM = max(float(sodium_mM), 0.0) + 120.0 * math.sqrt(free_mg)
+    na_eq_mM = max(na_eq_mM, 1.0)
+
+    return base_tm + 16.6 * math.log10(na_eq_mM / 1000.0)
+
 
 def max_run(seq: str) -> int:
     best = cur = 1
@@ -106,10 +125,15 @@ def dimer_risk_percent(p1: str, p2: str, max_k: int = 8) -> float:
 
 
 # ---------------- Candidate scoring ----------------
-
-def score_candidate(seq: str, tm_target: float, tm_tol: float) -> Optional[Tuple[float, float, float]]:
-    tm = tm_wallace(seq)
-    gc = gc_content(seq)
+def score_candidate(
+    seq: str,
+    tm_target: float,
+    tm_tol: float,
+    sodium_mM: float = 50.0,
+    mg_mM: float = 1.5,
+    dntp_mM: float = 0.2,
+) -> Optional[Tuple[float, float, float]]:
+    tm = tm_with_buffer(seq, sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM)
 
     if abs(tm - tm_target) > tm_tol:
         return None
@@ -139,7 +163,10 @@ def best_primer_from_exon(
     min_len: int,
     max_len: int,
     tm_target: float,
-    tm_tol: float
+    tm_tol: float,
+    sodium_mM: float = 50.0,
+    mg_mM: float = 1.5,
+    dntp_mM: float = 0.2,
 ) -> PrimerHit:
     exon_seq = clean_seq(exon_seq)
     best: Optional[PrimerHit] = None
@@ -149,9 +176,14 @@ def best_primer_from_exon(
             window = exon_seq[i:i + L]
             primer = window if kind == "FWD" else revcomp(window)
 
-            scored = score_candidate(primer, tm_target, tm_tol)
-            if scored is None:
-                continue
+            scored = score_candidate(
+                primer,
+                tm_target,
+                tm_tol,
+                sodium_mM=sodium_mM,
+                mg_mM=mg_mM,
+                dntp_mM=dntp_mM,
+            )
 
             score, tm, gc = scored
             hit = PrimerHit(
@@ -181,7 +213,10 @@ def best_reverse_avoiding_fwds(
     max_len: int,
     tm_target: float,
     tm_tol: float,
-    dimer_k: int = 4
+    dimer_k: int = 4,
+    sodium_mM: float = 50.0,
+    mg_mM: float = 1.5,
+    dntp_mM: float = 0.2,
 ) -> PrimerHit:
     exon_seq = clean_seq(exon_seq_for_reverse)
     candidates: List[PrimerHit] = []
@@ -191,7 +226,14 @@ def best_reverse_avoiding_fwds(
             template_seq = exon_seq[i:i + L]
             rev_primer = revcomp(template_seq)
 
-            scored = score_candidate(rev_primer, tm_target, tm_tol)
+            scored = score_candidate(
+                rev_primer,
+                tm_target,
+                tm_tol,
+                sodium_mM=sodium_mM,
+                mg_mM=mg_mM,
+                dntp_mM=dntp_mM,
+            )
             if scored is None:
                 continue
 
@@ -233,11 +275,48 @@ def design_exon_primers(
     max_len: int = 25,
     tm_target: float = 60.0,
     tm_tol: float = 5.0,
-    dimer_k: int = 4
+    dimer_k: int = 4,
+    sodium_mM: float = 50.0,
+    mg_mM: float = 1.5,
+    dntp_mM: float = 0.2,
 ) -> Tuple[PrimerHit, PrimerHit, PrimerHit]:
-    fwd1 = best_primer_from_exon(exon1, "Exon1", "FWD", min_len, max_len, tm_target, tm_tol)
-    fwd2 = best_primer_from_exon(exon2, "Exon2", "FWD", min_len, max_len, tm_target, tm_tol)
-    rev3 = best_reverse_avoiding_fwds(exon3_for_reverse, fwd1, fwd2, min_len, max_len, tm_target, tm_tol, dimer_k=dimer_k)
+     fwd1 = best_primer_from_exon(
+        exon1,
+        "Exon1",
+        "FWD",
+        min_len,
+        max_len,
+        tm_target,
+        tm_tol,
+        sodium_mM=sodium_mM,
+        mg_mM=mg_mM,
+        dntp_mM=dntp_mM,
+    )
+    fwd2 = best_primer_from_exon(
+        exon2,
+        "Exon2",
+        "FWD",
+        min_len,
+        max_len,
+        tm_target,
+        tm_tol,
+        sodium_mM=sodium_mM,
+        mg_mM=mg_mM,
+        dntp_mM=dntp_mM,
+    )
+    rev3 = best_reverse_avoiding_fwds(
+        exon3_for_reverse,
+        fwd1,
+        fwd2,
+        min_len,
+        max_len,
+        tm_target,
+        tm_tol,
+        dimer_k=dimer_k,
+        sodium_mM=sodium_mM,
+        mg_mM=mg_mM,
+        dntp_mM=dntp_mM,
+    )
     return fwd1, fwd2, rev3
 
 
@@ -271,7 +350,10 @@ def design_basic_pcr_primers(
     end_window: int = 300,
     amplicon_min: int = 100,
     amplicon_max: int = 500,
-    dimer_k: int = 4
+    dimer_k: int = 4,
+    sodium_mM: float = 50.0,
+    mg_mM: float = 1.5,
+    dntp_mM: float = 0.2,
 ) -> Tuple[str, str, int, int, int]:
     """
     Returns:
@@ -299,7 +381,14 @@ def design_basic_pcr_primers(
     for Lf in range(min_len, max_len + 1):
         for i in range(0, fwd_region_end - Lf + 1):
             fwd = seq[i:i + Lf]
-            f_scored = score_candidate(fwd, tm_target, tm_tol)
+            f_scored = score_candidate(
+                fwd,
+                tm_target,
+                tm_tol,
+                sodium_mM=sodium_mM,
+                mg_mM=mg_mM,
+                dntp_mM=dntp_mM,
+            )
             if f_scored is None:
                 continue
             f_score, _, _ = f_scored
@@ -320,7 +409,14 @@ def design_basic_pcr_primers(
                     bind_site = seq[j:j + Lr]
                     rev = revcomp(bind_site)
 
-                    r_scored = score_candidate(rev, tm_target, tm_tol)
+                    r_scored = score_candidate(
+                        rev,
+                        tm_target,
+                        tm_tol,
+                        sodium_mM=sodium_mM,
+                        mg_mM=mg_mM,
+                        dntp_mM=dntp_mM,
+                    )
                     if r_scored is None:
                         continue
                     r_score, _, _ = r_scored
