@@ -5,7 +5,8 @@ from qpcr_engine import (
     amplicon_size_from_hits,
     design_qpcr_junction_pair,
 )
-
+from ui.text import BLAST_INSTRUCTIONS
+from utils.blast import primer_blast_url_pair, primer_blast_url_single
 
 def render():
     st.header("qPCR primer designer")
@@ -145,11 +146,29 @@ def render():
             st.markdown("Reverse primer 5 to 3")
             st.code(rev.seq_5to3)
             st.write(f"Tm {rev.tm_c:.1f} C, GC {rev.gc_pct:.1f} percent")
+            
+            st.subheader("Primer-BLAST links (NCBI)")
+            organism = "Homo sapiens"
+            pair_url = primer_blast_url_pair(fwd.seq_5to3, rev.seq_5to3, organism)
+            st.markdown(f"**qPCR pair**: [Open in Primer-BLAST]({pair_url})")
+
+            with st.expander("Single-primer Primer-BLAST links"):
+                st.markdown(
+                    f"**Forward primer**: [Primer-BLAST]({primer_blast_url_single(fwd.seq_5to3, organism)})"
+                )
+                st.markdown(
+                    f"**Reverse primer**: [Primer-BLAST]({primer_blast_url_single(rev.seq_5to3, organism)})"
+                )
 
             if probe is not None:
                 st.markdown("TaqMan probe 5 to 3")
                 st.code(probe.seq_5to3)
                 st.write(f"Tm {probe.tm_c:.1f} C, GC {probe.gc_pct:.1f} percent")
+                st.markdown(
+                    f"**Probe**: [Primer-BLAST]({primer_blast_url_single(probe.seq_5to3, organism)})"
+                )
+
+            st.info(BLAST_INSTRUCTIONS)
 
         except Exception as e:
             st.error(f"qPCR design failed: {e}")
