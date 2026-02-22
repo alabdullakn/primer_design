@@ -31,12 +31,16 @@ def render():
         <style>
         {_background_style()}
 
+        .stApp, .stApp * {{
+            font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        }}
+
         .hero-title {{
             text-align: center;
-            font-size: 4.1rem;
+            font-size: 4.3rem;
             font-weight: 900;
             color: #f8fafc;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.02em;
             margin-top: 0.6rem;
             margin-bottom: 0.3rem;
             text-shadow: 0 6px 30px rgba(0, 0, 0, 0.45);
@@ -45,40 +49,43 @@ def render():
         .hero-sub {{
             text-align: center;
             color: #dbeafe;
-            font-size: 1.08rem;
+            font-size: 1.14rem;
             margin-bottom: 1.25rem;
-        }}
-
-        .workflow-label {{
-            text-align: center;
-            font-weight: 750;
-            color: #f1f5f9;
-            margin-bottom: 0.3rem;
-            font-size: 1.95rem;
         }}
 
         .workflow-note {{
             text-align: center;
             color: #dbeafe;
-            font-size: 0.98rem;
-            min-height: 2.8rem;
-            margin-bottom: 0.75rem;
+            font-size: 1.02rem;
+            line-height: 1.35;
+            margin-top: 0.45rem;
         }}
 
         div[data-testid="stButton"] > button {{
-            height: 68px;
-            border-radius: 12px;
-            font-size: 1.15rem;
-            font-weight: 700;
-            border: 1px solid rgba(125, 211, 252, 0.95);
-            background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
-            color: #eff6ff;
-            box-shadow: 0 10px 24px rgba(29, 78, 216, 0.35);
+            min-height: 90px;
+            border-radius: 14px;
+            font-size: 3rem;
+            font-weight: 900;
+            border: 1px solid rgba(103, 232, 249, 0.95);
+            background: linear-gradient(180deg, #0f766e 0%, #115e59 100%);
+            color: #ecfeff;
+            box-shadow: 0 10px 24px rgba(15, 118, 110, 0.35);
+            line-height: 1.05;
+            white-space: nowrap;
+            text-wrap: balance;
+        }}
+
+        div[data-testid="stButton"] > button p {{
+            margin: 0;
+            line-height: 1.05;
+            font-weight: 900;
+            font-size: 0.62em;
+            letter-spacing: 0.01em;
         }}
 
         div[data-testid="stButton"] > button:hover {{
-            border-color: #bfdbfe;
-            background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+            border-color: #a5f3fc;
+            background: linear-gradient(180deg, #0f766e 0%, #0f766e 100%);
             color: #ffffff;
         }}
         </style>
@@ -95,19 +102,16 @@ def render():
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        st.markdown('<div class="workflow-label">Regular PCR</div>', unsafe_allow_html=True)
+        go_regular = st.button("Regular PCR", key="home_regular", width="stretch")
         st.markdown('<div class="workflow-note">Design a standard forward/reverse primer pair.</div>', unsafe_allow_html=True)
-        go_regular = st.button("Open Regular PCR", key="home_regular", width="stretch")
 
     with c2:
-        st.markdown('<div class="workflow-label">Splicing primers</div>', unsafe_allow_html=True)
+        go_splicing = st.button("Splicing primers", key="home_splicing", width="stretch")
         st.markdown('<div class="workflow-note">Build overlap/splicing primer designs.</div>', unsafe_allow_html=True)
-        go_splicing = st.button("Open Splicing Primers", key="home_splicing", width="stretch")
 
     with c3:
-        st.markdown('<div class="workflow-label">qPCR primers</div>', unsafe_allow_html=True)
+        go_qpcr = st.button("qPCR primers", key="home_qpcr", width="stretch")
         st.markdown('<div class="workflow-note">Generate qPCR-friendly primer candidates.</div>', unsafe_allow_html=True)
-        go_qpcr = st.button("Open qPCR Primers", key="home_qpcr", width="stretch")
 
     if go_regular:
         st.session_state["requested_tab"] = "Regular PCR"
