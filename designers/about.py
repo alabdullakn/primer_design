@@ -52,7 +52,7 @@ def render():
             </p>
 
             References:
-            Images used in this project were created with BioRender.
+            Images used were created with BioRender.com
 
             Citation request:
             
