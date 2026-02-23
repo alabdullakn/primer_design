@@ -93,7 +93,7 @@ def render():
     st.subheader("Choose which condition to generate")
     st.caption("Look at the image above for reference.")
     
-    st.markdown(
+     st.markdown(
         """
         <style>
         .st-key-splicing_condition [role="radiogroup"] {
@@ -102,24 +102,24 @@ def render():
         }
 
         .st-key-splicing_condition [role="radiogroup"] > label {
-            flex: 1 1 280px;
-            min-height: 4.1rem;
+            flex: 1 1 320px;
+            min-height: 3.4rem;
             align-items: center;
             justify-content: center;
-            padding: 0.45rem 0.75rem;
+            padding: 0.4rem 0.7rem;
         }
 
         .st-key-splicing_condition [role="radiogroup"] > label p {
-            white-space: normal;
-            text-wrap: balance;
+            white-space: nowrap;
             text-align: center;
-            line-height: 1.25;
-            font-size: clamp(0.9rem, 1vw + 0.35rem, 1.4rem);
+            line-height: 1.15;
+            font-size: clamp(0.78rem, 0.45vw + 0.55rem, 1.02rem);
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
 
     condition = st.radio(
         "Splicing primer condition",
