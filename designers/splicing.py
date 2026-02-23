@@ -93,7 +93,7 @@ def render():
     st.subheader("Choose which condition to generate")
     st.caption("Look at the image above for reference.")
     
-     st.markdown(
+    st.markdown(
         """
         <style>
         .st-key-splicing_condition [role="radiogroup"] {
