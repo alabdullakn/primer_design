@@ -90,30 +90,24 @@ def render():
                 key="splicing_dntp_mM",
                 disabled=not edit_reaction_buffer,
             )
-    st.subheader("Choose condition(s) to generate primer pairs")
+    st.subheader("Choose which condition to generate")
     st.caption("Look at the image above for reference.")
 
-    cond1 = st.checkbox(
-        "Condition 1: FWD A + FWD B + REV A",
-        value=True,
-        key="splicing_condition_1",
+    condition = st.radio(
+        "Splicing primer condition",
+        options=[
+            "Condition 1: FWD A + FWD B + REV A",
+            "Condition 2: FWD A + REV A + REV B",
+        ],
+        index=0,
+        key="splicing_condition",
+        label_visibility="collapsed",
     )
-    cond2 = st.checkbox(
-        "Condition 2: FWD A + REV A + REV B",
-        key="splicing_condition_2",
-    )
 
-    selected_pairs = []
-    if cond1:
-        selected_pairs.extend(["FWD A + REV A", "FWD B + REV A"])
-    if cond2:
-        selected_pairs.extend(["FWD A + REV A", "FWD A + REV B"])
-
-    selected_pairs = list(dict.fromkeys(selected_pairs))
-
-    if len(selected_pairs) == 0:
-        st.error("Please select at least one condition.")
-        return
+    if condition.startswith("Condition 1"):
+        selected_pairs = ["FWD A + REV A", "FWD B + REV A"]
+    else:
+        selected_pairs = ["FWD A + REV A", "FWD A + REV B"]
 
     needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
     needs_fwd_b = any(p.startswith("FWD B") for p in selected_pairs)
