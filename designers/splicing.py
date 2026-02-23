@@ -90,7 +90,7 @@ def render():
                 key="splicing_dntp_mM",
                 disabled=not edit_reaction_buffer,
             )
-    st.subheader("Choose which primer pairs to generate (max 2)")
+    st.subheader("Choose 2 options below of primer pairs to generate (max 2)")
 
     colA, colB = st.columns(2)
     with colA:
