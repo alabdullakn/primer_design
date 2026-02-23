@@ -3,11 +3,18 @@ from ui.styles import apply_styles
 apply_styles()
 
 import streamlit as st
+
+st.set_page_config(
+    page_title="PrimerQ",
+    page_icon="🧬",
+)
+import streamlit as st
 from designers.regular_pcr import render as render_regular
 from designers.splicing import render as render_splicing
 from designers.home import render as render_home
 from designers.about import render as render_about
 from ui.footer import add_footer
+
 
 st.set_page_config(page_title="Qprimer", layout="wide")
 apply_styles()
