@@ -56,8 +56,8 @@ def render():
 
             Citation request:
             
-                We request, but do not require, that use of this software be cited in publications as:<br/>
-                <em>Alabdulla, K. (n.d.). QPrimer [Software].
+            We request, but do not require, that use of this software be cited in publications as:
+            Alabdulla, K. (n.d.). QPrimer [Software].
             
         </div>
         """,
