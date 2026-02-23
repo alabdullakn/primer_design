@@ -55,9 +55,8 @@ def render():
             Images used were created with BioRender.com
 
             Citation request:
-            
             We request, but do not require, that use of this software be cited in publications as:
-            Alabdulla, K. (n.d.). QPrimer [Software].
+            Alabdulla, K. (n.d.). PrimerQ [Software].
             
         </div>
         """,
