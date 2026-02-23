@@ -51,10 +51,10 @@ def render():
                 I would also like to thank my professors for their guidance and support.
             </p>
 
-            References</strong>
-            <p>Images used in this project were created with BioRender.</p>
+            References:
+            Images used in this project were created with BioRender.
 
-            Citation request</strong>
+            Citation request:
             
                 We request, but do not require, that use of this software be cited in publications as:<br/>
                 <em>Alabdulla, K. (n.d.). QPrimer [Software].
