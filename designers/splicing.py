@@ -109,7 +109,7 @@ def render():
             justify-content: center;
             padding: 0.4rem 0.7rem;
         }
-
+        .st-key-splicing_condition [role="radiogroup"] > label p {
             white-space: normal;
             overflow-wrap: anywhere;
             text-align: center;
@@ -122,6 +122,13 @@ def render():
                 flex-basis: 100%;
             }
         }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    condition = st.radio(
+        "Choose condition",
         options=[
             "Condition 1: FWD A + FWD B + REV A",
             "Condition 2: FWD A + REV A + REV B",
