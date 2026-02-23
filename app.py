@@ -3,11 +3,12 @@ from ui.styles import apply_styles
 apply_styles()
 
 import streamlit as st
-
 st.set_page_config(
     page_title="PrimerQ",
     page_icon="🧬",
+    layout="wide",
 )
+
 import streamlit as st
 from designers.regular_pcr import render as render_regular
 from designers.splicing import render as render_splicing
