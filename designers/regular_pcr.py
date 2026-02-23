@@ -88,14 +88,41 @@ def render():
                 key="reg_end_window_ui",
             )
         st.markdown("---")
-        st.caption("Reaction chemistry (used for Tm correction)")
+        st.caption("Reaction buffer (used for Tm correction)")
+        edit_reaction_buffer = st.checkbox(
+            "Edit reaction buffer",
+            value=False,
+            key="reg_edit_reaction_buffer",
+            help="Enable to customize salt, Mg²⁺, and dNTP concentrations.",
+        )
         c5, c6, c7 = st.columns(3)
         with c5:
-            sodium_mM = st.number_input("Monovalent salt [Na+] mM", 1.0, 500.0, 50.0, key="reg_na_mM")
+            sodium_mM = st.number_input(
+                "Monovalent salt [Na+] mM",
+                1.0,
+                500.0,
+                50.0,
+                key="reg_na_mM",
+                disabled=not edit_reaction_buffer,
+            )
         with c6:
-            mg_mM = st.number_input("Mg²⁺ concentration mM", 0.0, 20.0, 1.5, key="reg_mg_mM")
+            mg_mM = st.number_input(
+                "Mg²⁺ concentration mM",
+                0.0,
+                20.0,
+                1.5,
+                key="reg_mg_mM",
+                disabled=not edit_reaction_buffer,
+            )
         with c7:
-            dntp_mM = st.number_input("Total dNTP mM", 0.0, 10.0, 0.2, key="reg_dntp_mM")
+            dntp_mM = st.number_input(
+                "Total dNTP mM",
+                0.0,
+                10.0,
+                0.2,
+                key="reg_dntp_mM",
+                disabled=not edit_reaction_buffer,
+            )
 
 
     
