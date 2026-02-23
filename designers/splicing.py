@@ -90,29 +90,29 @@ def render():
                 key="splicing_dntp_mM",
                 disabled=not edit_reaction_buffer,
             )
-    st.subheader("Choose 2 options below of primer pairs to generate (max 2)")
+    st.subheader("Choose condition(s) to generate primer pairs")
+    st.caption("Look at the image above for reference.")
 
-    colA, colB = st.columns(2)
-    with colA:
-        pair_aa = st.checkbox("FWD A + REV A", value=True, key="splicing_pair_aa")
-        pair_ab = st.checkbox("FWD A + REV B", key="splicing_pair_ab")
-    with colB:
-        pair_ba = st.checkbox("FWD B + REV A", key="splicing_pair_ba")
+    cond1 = st.checkbox(
+        "Condition 1: FWD A + FWD B + REV A",
+        value=True,
+        key="splicing_condition_1",
+    )
+    cond2 = st.checkbox(
+        "Condition 2: FWD A + REV A + REV B",
+        key="splicing_condition_2",
+    )
 
     selected_pairs = []
-    if pair_aa:
-        selected_pairs.append("FWD A + REV A")
-    if pair_ab:
-        selected_pairs.append("FWD A + REV B")
-    if pair_ba:
-        selected_pairs.append("FWD B + REV A")
+    if cond1:
+        selected_pairs.extend(["FWD A + REV A", "FWD B + REV A"])
+    if cond2:
+        selected_pairs.extend(["FWD A + REV A", "FWD A + REV B"])
+
+    selected_pairs = list(dict.fromkeys(selected_pairs))
 
     if len(selected_pairs) == 0:
-        st.error("Please select at least one primer pair.")
-        return
-
-    if len(selected_pairs) > 2:
-        st.error("Maximum 2 primer pairs allowed.")
+        st.error("Please select at least one condition.")
         return
 
     needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
