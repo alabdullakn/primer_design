@@ -103,26 +103,25 @@ def render():
 
         .st-key-splicing_condition [role="radiogroup"] > label {
             flex: 1 1 320px;
+            min-width: 0;
             min-height: 3.4rem;
             align-items: center;
             justify-content: center;
             padding: 0.4rem 0.7rem;
         }
 
-        .st-key-splicing_condition [role="radiogroup"] > label p {
-            white-space: nowrap;
+            white-space: normal;
+            overflow-wrap: anywhere;
             text-align: center;
             line-height: 1.15;
             font-size: clamp(0.78rem, 0.45vw + 0.55rem, 1.02rem);
         }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
-
-    condition = st.radio(
-        "Splicing primer condition",
+        @media (max-width: 640px) {
+            .st-key-splicing_condition [role="radiogroup"] > label {
+                flex-basis: 100%;
+            }
+        }
         options=[
             "Condition 1: FWD A + FWD B + REV A",
             "Condition 2: FWD A + REV A + REV B",
