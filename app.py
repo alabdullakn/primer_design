@@ -17,7 +17,7 @@ from designers.about import render as render_about
 from ui.footer import add_footer
 
 
-st.set_page_config(page_title="Qprimer", layout="wide")
+st.set_page_config(page_title="PrimerQ", layout="wide")
 apply_styles()
 
 st.markdown(
