@@ -83,7 +83,7 @@ def render():
                 "Reverse search window (bp from 3')",
                 min_value=50,
                 max_value=20000,
-                value=300,
+                value=1000,
                 step=50,
                 key="reg_end_window_ui",
             )
