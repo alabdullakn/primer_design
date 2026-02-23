@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import base64
 from pathlib import Path
 
 from primer_engine import design_exon_primers, print_dimer_report
@@ -17,7 +18,15 @@ def render():
 
     st.subheader("Examples")
     if SPLICING_IMG.exists():
-        st.image(str(SPLICING_IMG), use_container_width=True)
+        image_b64 = base64.b64encode(SPLICING_IMG.read_bytes()).decode("utf-8")
+        st.markdown(
+            f"""
+            <div style=\"max-width:700px; margin:0 auto; padding:10px; border:1px solid rgba(255, 255, 255, 0.35); border-radius:10px; background:rgba(255, 255, 255, 0.08);\">
+                <img src=\"data:image/png;base64,{image_b64}\" style=\"width:100%; display:block; border-radius:6px;\" />
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     else:
         st.info("Image not found: assets/splicing_examples.png")
 
