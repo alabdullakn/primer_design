@@ -29,6 +29,8 @@ def render():
         )
     else:
         st.info("Image not found: assets/splicing_examples.png")
+        
+    st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
 
     with st.expander("Primer design parameters", expanded=False):
         c1, c2 = st.columns(2)
@@ -53,15 +55,40 @@ def render():
             )
 
         st.markdown("---")
-        st.caption("Reaction chemistry (used for Tm correction)")
+        st.caption("Reaction buffer (used for Tm correction)")
+        edit_reaction_buffer = st.checkbox(
+            "Edit reaction buffer",
+            value=False,
+            key="splicing_edit_reaction_buffer",
+            help="Enable to customize salt, Mg²⁺, and dNTP concentrations.",
+        )
         c3, c4, c5 = st.columns(3)
         with c3:
-            sodium_mM = st.number_input("Monovalent salt [Na+] mM", 1.0, 500.0, 50.0, key="splicing_na_mM")
+                "Monovalent salt [Na+] mM",
+                1.0,
+                500.0,
+                50.0,
+                key="splicing_na_mM",
+                disabled=not edit_reaction_buffer,
+            )
         with c4:
-            mg_mM = st.number_input("Mg²⁺ concentration mM", 0.0, 20.0, 1.5, key="splicing_mg_mM")
+            mg_mM = st.number_input(
+                "Mg²⁺ concentration mM",
+                0.0,
+                20.0,
+                1.5,
+                key="splicing_mg_mM",
+                disabled=not edit_reaction_buffer,
+            )
         with c5:
-            dntp_mM = st.number_input("Total dNTP mM", 0.0, 10.0, 0.2, key="splicing_dntp_mM")
-
+            dntp_mM = st.number_input(
+                "Total dNTP mM",
+                0.0,
+                10.0,
+                0.2,
+                key="splicing_dntp_mM",
+                disabled=not edit_reaction_buffer,
+            )
     st.subheader("Choose which primer pairs to generate (max 2)")
 
     colA, colB = st.columns(2)
