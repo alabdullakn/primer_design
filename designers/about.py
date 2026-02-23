@@ -42,7 +42,7 @@ def render():
         <div class="about-card">
             <h2>About Us</h2>
             <p>
-                My name is <strong>Khalid Alabdulla</strong> from <strong>Carnegie Mellon University</strong>.
+                My name is <strong>Khalid Alabdulla</strong> from <strong>Carnegie Mellon University Qatar</strong>.
                 I created this website because I found it difficult to find easy-to-use websites for designing
                 splicing and qPCR primers.
             </p>
@@ -51,14 +51,14 @@ def render():
                 I would also like to thank my professors for their guidance and support.
             </p>
 
-            <h3>References</h3>
+            References</strong>
             <p>Images used in this project were created with BioRender.</p>
 
-            <h3>Citation request</h3>
-            <p>
+            Citation request</strong>
+            
                 We request, but do not require, that use of this software be cited in publications as:<br/>
-                <em>Alabdulla, K. (n.d.). QPrimer [Software].</em>
-            </p>
+                <em>Alabdulla, K. (n.d.). QPrimer [Software].
+            
         </div>
         """,
         unsafe_allow_html=True,
