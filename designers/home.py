@@ -117,7 +117,7 @@ def render():
     st.markdown(
         (
             '<div class="hero-sub">Welcome to PrimerQ, the easiest website to design your primers. '
-            'To continue pick one of the options below.</div>'
+            'To continue pick one of the options below:</div>'
         ),
         unsafe_allow_html=True,
     )
