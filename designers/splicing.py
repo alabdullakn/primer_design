@@ -64,6 +64,7 @@ def render():
         )
         c3, c4, c5 = st.columns(3)
         with c3:
+            sodium_mM = st.number_input(
                 "Monovalent salt [Na+] mM",
                 1.0,
                 500.0,
