@@ -12,21 +12,6 @@ from ui.styles import apply_styles
 apply_styles()
 
 # ---------------- SEO TEXT (GOOGLE READS THIS) ----------------
-st.markdown("""
-# PrimerQ
-
-PrimerQ is a free online primer design platform for molecular biology research.
-
-Design primers for:
-- qPCR primer design
-- exon junction primers
-- alternative splicing detection
-- SYBR Green qPCR primers
-- TaqMan probe primers
-- standard PCR primers
-
-Built for gene expression analysis, RNA splicing studies, and cancer research workflows.
-""")
 
 # Hidden keywords to help search engines understand the site topic
 st.markdown("""
