@@ -1,25 +1,55 @@
-from ui.styles import apply_styles
-
-apply_styles()
-
 import streamlit as st
+
+# ---------------- PAGE CONFIG (MUST BE FIRST STREAMLIT CALL) ----------------
 st.set_page_config(
-    page_title="PrimerQ",
+    page_title="PrimerQ | qPCR Primer Design and Splicing Primer Tool",
     page_icon="🧬",
     layout="wide",
 )
 
-import streamlit as st
+# ---------------- STYLES ----------------
+from ui.styles import apply_styles
+apply_styles()
+
+# ---------------- SEO TEXT (GOOGLE READS THIS) ----------------
+st.markdown("""
+# PrimerQ
+
+PrimerQ is a free online primer design platform for molecular biology research.
+
+Design primers for:
+- qPCR primer design
+- exon junction primers
+- alternative splicing detection
+- SYBR Green qPCR primers
+- TaqMan probe primers
+- standard PCR primers
+
+Built for gene expression analysis, RNA splicing studies, and cancer research workflows.
+""")
+
+# Hidden keywords to help search engines understand the site topic
+st.markdown("""
+<div style="display:none;">
+qPCR primer design tool
+splicing primer designer
+exon junction primer design
+PCR primer design online
+SYBR Green primer design
+TaqMan probe design tool
+gene expression primer design software
+primer design web app
+</div>
+""", unsafe_allow_html=True)
+
+# ---------------- IMPORT APP MODULES ----------------
 from designers.regular_pcr import render as render_regular
 from designers.splicing import render as render_splicing
 from designers.home import render as render_home
 from designers.about import render as render_about
 from ui.footer import add_footer
 
-
-st.set_page_config(page_title="PrimerQ", layout="wide")
-apply_styles()
-
+# ---------------- YOUR EXISTING CSS ----------------
 st.markdown(
     """
     <style>
@@ -31,7 +61,6 @@ st.markdown(
         width: 100%;
     }
 
-
     div[role="radiogroup"] > label {
         width: 100%;
         margin: 0;
@@ -42,7 +71,6 @@ st.markdown(
         border-radius: 10px;
         padding: 0.3rem 0.35rem;
     }
-
 
     div[role="radiogroup"] > label > div:first-child {
         display: none;
@@ -67,10 +95,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ---------------- NAVIGATION ----------------
 TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers", "About us"]
+
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Home"
-
 
 if "requested_tab" in st.session_state:
     st.session_state["active_tab"] = st.session_state.pop("requested_tab")
@@ -83,21 +112,26 @@ st.radio(
     label_visibility="collapsed",
 )
 
+# ---------------- ROUTING ----------------
 if st.session_state["active_tab"] == "Home":
     render_home()
+
 elif st.session_state["active_tab"] == "Regular PCR":
     render_regular()
+
 elif st.session_state["active_tab"] == "Splicing primers":
     render_splicing()
+
 elif st.session_state["active_tab"] == "qPCR primers":
     try:
         from designers.qpcr import render as render_qpcr
-
         render_qpcr()
     except Exception as e:
         st.error("qPCR tab crashed during import or rendering.")
         st.exception(e)
+
 else:
     render_about()
 
+# ---------------- FOOTER ----------------
 add_footer()
