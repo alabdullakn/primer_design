@@ -2,7 +2,7 @@ import streamlit as st
 
 # ---------------- PAGE CONFIG (MUST BE FIRST STREAMLIT CALL) ----------------
 st.set_page_config(
-    page_title="PrimerQ | qPCR Primer Design and Splicing Primer Tool",
+    page_title="PrimerQ",
     page_icon="🧬",
     layout="wide",
 )
