@@ -40,24 +40,30 @@ def render():
     st.markdown(
         """
         <div class="about-card">
-            <h2>About Us</h2>
+            <h2>About PrimerQ</h2>
             <p>
                 My name is <strong>Khalid Alabdulla</strong> from <strong>Carnegie Mellon University Qatar</strong>.
-                I created this website because I found it difficult to find easy-to-use websites for designing
+                I created this website because I found it difficult to find easy-to-use tools for designing
                 splicing and qPCR primers.
             </p>
             <p>
-                Hopefully this website is helpful for students, researchers, and anyone working with primer design.
+                PrimerQ supports <strong>Regular PCR</strong>, <strong>Splicing primers</strong> (exon skipping,
+                intron retention, alternative splice sites), and <strong>qPCR primers</strong> with both
+                junction-spanning and intron-flanking strategies. It includes <strong>TaqMan probe design</strong>,
+                <strong>in-app NCBI QBLAST specificity checking</strong>, nearest-neighbour Tm thermodynamics,
+                primer-dimer screening, and CSV export.
+            </p>
+            <p>
+                Hopefully this tool is helpful for students, researchers, and anyone working with primer design.
                 I would also like to thank my professors for their guidance and support.
             </p>
-
-            References:
-            Images used were created with BioRender.com
-
-            Citation request:
-            We request, but do not require, that use of this software be cited in publications as:
-            Alabdulla, K. (n.d.). PrimerQ [Software].
-            
+            <h3>References</h3>
+            <p>Images were created with <a href="https://www.biorender.com/" target="_blank" rel="noopener noreferrer">BioRender.com</a>.</p>
+            <h3>Citation</h3>
+            <p>
+                We request, but do not require, that use of this software be cited in publications as:<br>
+                <em>Alabdulla, K. (2025). PrimerQ [Software]. Carnegie Mellon University Qatar.</em>
+            </p>
         </div>
         """,
         unsafe_allow_html=True,

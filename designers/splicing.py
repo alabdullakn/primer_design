@@ -355,10 +355,13 @@ def render():
 
         if st.button("Check Specificity with BLAST", key="splicing_qblast_run"):
             blast_results = {}
-            for label, pseq in blast_seqs.items():
-                with st.spinner(f"BLASTing {label}…"):
-                    blast_results[label] = run_qblast(pseq, organism=_organism)
-            st.session_state["splicing_blast_results"] = blast_results
+            try:
+                for label, pseq in blast_seqs.items():
+                    with st.spinner(f"BLASTing {label} (~30 s)…"):
+                        blast_results[label] = run_qblast(pseq, organism=_organism)
+                st.session_state["splicing_blast_results"] = blast_results
+            except RuntimeError as e:
+                st.error(str(e))
 
         blast_results = st.session_state.get("splicing_blast_results")
         if blast_results:

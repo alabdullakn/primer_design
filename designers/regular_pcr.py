@@ -315,11 +315,14 @@ def render():
         st.caption("Queries NCBI BLAST directly — takes ~30 s per primer. Results persist until you redesign.")
         if st.button("Check Specificity with BLAST", key="reg_qblast_run"):
             blast_results = {}
-            with st.spinner("BLASTing forward primer…"):
-                blast_results["FWD"] = run_qblast(fwd, organism=_organism)
-            with st.spinner("BLASTing reverse primer…"):
-                blast_results["REV"] = run_qblast(rev, organism=_organism)
-            st.session_state["reg_blast_results"] = blast_results
+            try:
+                with st.spinner("BLASTing forward primer (~30 s)…"):
+                    blast_results["FWD"] = run_qblast(fwd, organism=_organism)
+                with st.spinner("BLASTing reverse primer (~30 s)…"):
+                    blast_results["REV"] = run_qblast(rev, organism=_organism)
+                st.session_state["reg_blast_results"] = blast_results
+            except RuntimeError as e:
+                st.error(str(e))
 
         blast_results = st.session_state.get("reg_blast_results")
         if blast_results:

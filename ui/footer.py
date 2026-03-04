@@ -3,11 +3,10 @@ def add_footer():
     st.markdown(
         """
         <style>
-        .stApp {
-            padding-bottom: 92px;
-        }
-
+        .stApp { padding-bottom: 92px; }
+        /* Override the global hide rule — only active when this is injected (Home page) */
         .qp-footer {
+            display: block !important;
             position: fixed;
             left: 0;
             right: 0;
@@ -20,7 +19,6 @@ def add_footer():
             font-size: 0.96rem;
             line-height: 1.45;
         }
-
         .qp-footer a {
             color: #60a5fa;
             text-decoration: underline;

@@ -19,6 +19,9 @@ def apply_styles():
 
         /* Make expanders a bit cleaner */
         details { border-radius: 12px; }
+
+        /* Footer hidden globally — only shown on Home page via add_footer() override */
+        .qp-footer { display: none !important; }
         </style>
         """,
         unsafe_allow_html=True

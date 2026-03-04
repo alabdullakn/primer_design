@@ -24,19 +24,26 @@ def run_qblast(
 
     Uses word_size=7 (required for short sequences like primers) and a high
     e-value cutoff so imperfect off-target matches are still returned.
+    Raises RuntimeError on network failure or NCBI timeout.
     """
-    handle = NCBIWWW.qblast(
-        "blastn",
-        "nt",
-        seq,
-        word_size=7,
-        expect=1000,
-        perc_ident=70,
-        hitlist_size=max_hits,
-        entrez_query=f"{organism}[Organism]",
-    )
+    import socket
+    try:
+        handle = NCBIWWW.qblast(
+            "blastn",
+            "nt",
+            seq,
+            word_size=7,
+            expect=1000,
+            perc_ident=70,
+            hitlist_size=max_hits,
+            entrez_query=f"{organism}[Organism]",
+        )
+        records = list(NCBIXML.parse(handle))
+    except (socket.timeout, OSError) as e:
+        raise RuntimeError("NCBI QBLAST timed out. Try again in a few minutes.") from e
+    except Exception as e:
+        raise RuntimeError(f"QBLAST failed: {e}") from e
 
-    records = list(NCBIXML.parse(handle))
     if not records:
         return []
 
