@@ -118,7 +118,7 @@ def render():
     st.markdown(
         (
             '<div class="hero-sub">Welcome to PrimerQ — design PCR, qPCR, and splicing primers in seconds. '
-            'Run in-app NCBI QBLAST specificity checks, get TaqMan probes, and export results as CSV. '
+            'Run in-app NCBI QBLAST specificity checks, get TaqMan probes, and export results as CSV.<br>'
             'To continue, pick one of the options below:</div>'
         ),
         unsafe_allow_html=True,
