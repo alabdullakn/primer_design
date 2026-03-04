@@ -76,7 +76,7 @@ def render():
         r1, r2 = st.columns(2)
         with r1:
             min_len = st.number_input("Min length", 16, 28, 18, key="qpcr_min_len")
-            tm_target = st.number_input("Tm target (°C)", 50.0, 70.0, 60.0, key="qpcr_tm_target")
+            tm_target = st.number_input("Tm target (°C)", 50.0, 75.0, 65.0, key="qpcr_tm_target")
             gc_min = st.number_input("GC min percent", 20.0, 80.0, 40.0, key="qpcr_gc_min")
             amp_min = st.number_input("Amplicon min bp", 40, 300, 70, key="qpcr_amp_min")
             if is_junction:
