@@ -23,6 +23,10 @@ def add_footer():
             color: #60a5fa;
             text-decoration: underline;
         }
+        @media (max-width: 768px) {
+            .qp-footer { font-size: 0.78rem !important; padding: 0.5rem 0.75rem !important; }
+            .stApp { padding-bottom: 72px !important; }
+        }
         </style>
 
         <div class="qp-footer">

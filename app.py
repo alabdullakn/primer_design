@@ -75,6 +75,29 @@ st.markdown(
         background: linear-gradient(180deg, rgba(37, 99, 235, 0.96), rgba(30, 64, 175, 0.96));
         box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
     }
+
+    /* ── Mobile: wrap nav into 2 rows of 3 ── */
+    @media (max-width: 768px) {
+        div[role="radiogroup"] {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+        div[role="radiogroup"] > label p {
+            font-size: 0.72rem !important;
+            white-space: normal !important;
+            line-height: 1.2 !important;
+        }
+        div[role="radiogroup"] > label {
+            padding: 0.25rem 0.2rem !important;
+        }
+        /* Stack home page buttons vertically */
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
