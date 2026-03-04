@@ -80,14 +80,19 @@ st.markdown(
     @media (max-width: 768px) {
         div[role="radiogroup"] {
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            grid-auto-rows: 1fr !important;
+        }
+        div[role="radiogroup"] > label {
+            padding: 0.25rem 0.2rem !important;
+            min-height: 2.8rem !important;
+            align-items: center !important;
+            justify-content: center !important;
         }
         div[role="radiogroup"] > label p {
             font-size: 0.72rem !important;
             white-space: normal !important;
             line-height: 1.2 !important;
-        }
-        div[role="radiogroup"] > label {
-            padding: 0.25rem 0.2rem !important;
+            text-align: center !important;
         }
         /* Stack home page buttons vertically */
         section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] {
