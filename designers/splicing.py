@@ -5,16 +5,27 @@ from pathlib import Path
 
 from primer_engine import design_exon_primers, print_dimer_report
 from utils.blast import primer_blast_url_pair, primer_blast_url_single
+from utils.qblast import run_qblast, specificity_label
+from utils.seq import count_stripped
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from ui.footer import add_footer
+from ui.blocks import render_diagram, download_primers_csv
 
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 SPLICING_IMG = ASSETS_DIR / "splicing_examples.png"
 
 
 def render():
-    st.title("Splicing primers")
-    st.write("Design primers for exon skipping, intron retention, or alternative splicing.")
+    col_title, col_btn = st.columns([5, 1])
+    with col_title:
+        st.title("Splicing primers")
+        st.write("Design primers for exon skipping, intron retention, or alternative splicing.")
+    with col_btn:
+        st.write("")  # vertical alignment spacer
+        if st.button("How to use", key="splicing_help_btn"):
+            st.session_state["tutorial_topic"] = "splicing"
+            st.session_state["requested_tab"] = "How to Use"
+            st.rerun()
 
     st.subheader("Examples")
     if SPLICING_IMG.exists():
@@ -45,6 +56,12 @@ def render():
             dimer_k = st.number_input(
                 "3' dimer check window (k)", 3, 10, 4, key="splicing_dimer_k"
             )
+            organism = st.selectbox(
+                "Organism (for BLAST)",
+                ["Homo sapiens", "Mus musculus", "Rattus norvegicus", "Danio rerio", "Drosophila melanogaster"],
+                index=0,
+                key="splicing_organism",
+            )
 
         with c2:
             tm_target = st.number_input(
@@ -53,6 +70,8 @@ def render():
             tm_tol = st.number_input(
                 "Tm tolerance (± °C)", 1.0, 20.0, 5.0, key="splicing_tm_tol"
             )
+            gc_min = st.number_input("GC min (%)", 20.0, 80.0, 35.0, key="splicing_gc_min")
+            gc_max = st.number_input("GC max (%)", 20.0, 80.0, 65.0, key="splicing_gc_max")
 
         st.markdown("---")
         st.caption("Reaction buffer (used for Tm correction)")
@@ -157,12 +176,20 @@ def render():
 
     if needs_fwd_a:
         exon_fwd_a = st.text_area("Forward A sequence", height=140, key="splicing_fwd_a")
+        if exon_fwd_a and count_stripped(exon_fwd_a):
+            st.warning(f"Forward A: {count_stripped(exon_fwd_a)} non-ACGT character(s) ignored.")
     if needs_fwd_b:
         exon_fwd_b = st.text_area("Forward B sequence", height=140, key="splicing_fwd_b")
+        if exon_fwd_b and count_stripped(exon_fwd_b):
+            st.warning(f"Forward B: {count_stripped(exon_fwd_b)} non-ACGT character(s) ignored.")
     if needs_rev_a:
         exon_rev_a = st.text_area("Reverse A sequence", height=140, key="splicing_rev_a")
+        if exon_rev_a and count_stripped(exon_rev_a):
+            st.warning(f"Reverse A: {count_stripped(exon_rev_a)} non-ACGT character(s) ignored.")
     if needs_rev_b:
         exon_rev_b = st.text_area("Reverse B sequence", height=140, key="splicing_rev_b")
+        if exon_rev_b and count_stripped(exon_rev_b):
+            st.warning(f"Reverse B: {count_stripped(exon_rev_b)} non-ACGT character(s) ignored.")
 
     missing = []
     if needs_fwd_a and not exon_fwd_a.strip():
@@ -179,99 +206,102 @@ def render():
         return
     st.markdown("---")
 
-    run = st.button("Design primers", key="splicing_design_btn")
-    if not run:
+    if int(max_len) < int(min_len):
+        st.error("Max primer length must be ≥ min primer length.")
         add_footer()
         return
 
-    try:
-        exon1_safe = exon_fwd_a.strip() if exon_fwd_a.strip() else exon_fwd_b.strip()
-        exon2_safe = exon_fwd_b.strip() if exon_fwd_b.strip() else exon1_safe
+    run = st.button("Design primers", key="splicing_design_btn")
 
-        res_A = None
-        res_B = None
+    if run:
+        try:
+            exon1_safe = exon_fwd_a.strip() if exon_fwd_a.strip() else exon_fwd_b.strip()
+            exon2_safe = exon_fwd_b.strip() if exon_fwd_b.strip() else exon1_safe
 
-        if needs_rev_a:
-            p1A, p2A, p3A = design_exon_primers(
-                exon1_safe,
-                exon2_safe,
-                exon_rev_a.strip(),
-                min_len=int(min_len),
-                max_len=int(max_len),
-                tm_target=float(tm_target),
-                tm_tol=float(tm_tol),
-                dimer_k=int(dimer_k),
-                sodium_mM=float(sodium_mM),
-                mg_mM=float(mg_mM),
-                dntp_mM=float(dntp_mM),
-            )
-            res_A = (p1A, p2A, p3A)
+            res_A = None
+            res_B = None
 
-        if needs_rev_b:
-            p1B, p2B, p3B = design_exon_primers(
-                exon1_safe,
-                exon2_safe,
-                exon_rev_b.strip(),
-                min_len=int(min_len),
-                max_len=int(max_len),
-                tm_target=float(tm_target),
-                tm_tol=float(tm_tol),
-                dimer_k=int(dimer_k),
-                sodium_mM=float(sodium_mM),
-                mg_mM=float(mg_mM),
-                dntp_mM=float(dntp_mM),
-            )
-            res_B = (p1B, p2B, p3B)
-            
+            if needs_rev_a:
+                p1A, p2A, p3A = design_exon_primers(
+                    exon1_safe, exon2_safe, exon_rev_a.strip(),
+                    min_len=int(min_len), max_len=int(max_len),
+                    tm_target=float(tm_target), tm_tol=float(tm_tol),
+                    dimer_k=int(dimer_k), sodium_mM=float(sodium_mM),
+                    mg_mM=float(mg_mM), dntp_mM=float(dntp_mM),
+                    gc_min=float(gc_min), gc_max=float(gc_max),
+                )
+                res_A = (p1A, p2A, p3A)
+
+            if needs_rev_b:
+                p1B, p2B, p3B = design_exon_primers(
+                    exon1_safe, exon2_safe, exon_rev_b.strip(),
+                    min_len=int(min_len), max_len=int(max_len),
+                    tm_target=float(tm_target), tm_tol=float(tm_tol),
+                    dimer_k=int(dimer_k), sodium_mM=float(sodium_mM),
+                    mg_mM=float(mg_mM), dntp_mM=float(dntp_mM),
+                    gc_min=float(gc_min), gc_max=float(gc_max),
+                )
+                res_B = (p1B, p2B, p3B)
+
+            from utils.seq import clean_seq as _cs
+            st.session_state["splicing_last_result"] = {
+                "res_A": res_A, "res_B": res_B,
+                "selected_pairs": selected_pairs, "organism": organism,
+                "len_exon1": len(_cs(exon1_safe)),
+                "len_exon_rev_a": len(_cs(exon_rev_a.strip())) if exon_rev_a.strip() else 0,
+                "len_exon_rev_b": len(_cs(exon_rev_b.strip())) if exon_rev_b.strip() else 0,
+            }
+            st.session_state.pop("splicing_blast_results", None)
+        except Exception as e:
+            st.error(str(e))
+
+    # ============================
+    # Show results (persists across reruns)
+    # ============================
+    result = st.session_state.get("splicing_last_result")
+    if result:
+        res_A = result["res_A"]
+        res_B = result["res_B"]
+        _selected_pairs = result["selected_pairs"]
+        _organism = result["organism"]
+
         st.success("Primers designed successfully.")
         st.caption(SCORE_EXPLANATION)
 
         out_rows = []
         blast_links = []
-        org = "Homo sapiens"
 
         def add_pair(pair_name: str, fwd_obj, rev_obj):
-            out_rows.append(
-                {
-                    "Pair": pair_name,
-                    "Type": "FWD",
-                    "Primer (5'→3')": fwd_obj.seq_5to3,
-                    "Length": fwd_obj.length,
-                    "Tm (°C)": round(fwd_obj.tm_c, 1),
-                    "GC (%)": round(fwd_obj.gc_pct, 1),
-                    "Score": round(fwd_obj.score, 2),
-                }
-            )
-            out_rows.append(
-                {
-                    "Pair": pair_name,
-                    "Type": "REV",
-                    "Primer (5'→3')": rev_obj.seq_5to3,
-                    "Length": rev_obj.length,
-                    "Tm (°C)": round(rev_obj.tm_c, 1),
-                    "GC (%)": round(rev_obj.gc_pct, 1),
-                    "Score": round(rev_obj.score, 2),
-                }
-            )
+            out_rows.append({
+                "Pair": pair_name, "Type": "FWD",
+                "Primer (5'→3')": fwd_obj.seq_5to3, "Length": fwd_obj.length,
+                "Tm (°C)": round(fwd_obj.tm_c, 1), "GC (%)": round(fwd_obj.gc_pct, 1),
+                "Score": round(fwd_obj.score, 2),
+            })
+            out_rows.append({
+                "Pair": pair_name, "Type": "REV",
+                "Primer (5'→3')": rev_obj.seq_5to3, "Length": rev_obj.length,
+                "Tm (°C)": round(rev_obj.tm_c, 1), "GC (%)": round(rev_obj.gc_pct, 1),
+                "Score": round(rev_obj.score, 2),
+            })
             blast_links.append(
-                (pair_name, primer_blast_url_pair(fwd_obj.seq_5to3, rev_obj.seq_5to3, org))
+                (pair_name, primer_blast_url_pair(fwd_obj.seq_5to3, rev_obj.seq_5to3, _organism))
             )
 
-        for p in selected_pairs:
+        for p in _selected_pairs:
             if p == "FWD A + REV A" and res_A is not None:
                 p1A, p2A, p3A = res_A
                 add_pair("FWD A + REV A", p1A, p3A)
-
             if p == "FWD B + REV A" and res_A is not None:
                 p1A, p2A, p3A = res_A
                 add_pair("FWD B + REV A", p2A, p3A)
-
             if p == "FWD A + REV B" and res_B is not None:
                 p1B, p2B, p3B = res_B
                 add_pair("FWD A + REV B", p1B, p3B)
 
         if out_rows:
             st.dataframe(pd.DataFrame(out_rows), use_container_width=True)
+            download_primers_csv(out_rows, filename="splicing_primers.csv")
 
         st.subheader("Primer-BLAST links (NCBI)")
         for name, url in blast_links:
@@ -281,25 +311,77 @@ def render():
         with st.expander("Single-primer Primer-BLAST links"):
             if res_A is not None:
                 p1A, p2A, p3A = res_A
-                st.markdown(f"**FWD A**: [Primer-BLAST]({primer_blast_url_single(p1A.seq_5to3, org)})")
-                st.markdown(f"**FWD B**: [Primer-BLAST]({primer_blast_url_single(p2A.seq_5to3, org)})")
-                st.markdown(f"**REV A**: [Primer-BLAST]({primer_blast_url_single(p3A.seq_5to3, org)})")
+                st.markdown(f"**FWD A**: [Primer-BLAST]({primer_blast_url_single(p1A.seq_5to3, _organism)})")
+                st.markdown(f"**FWD B**: [Primer-BLAST]({primer_blast_url_single(p2A.seq_5to3, _organism)})")
+                st.markdown(f"**REV A**: [Primer-BLAST]({primer_blast_url_single(p3A.seq_5to3, _organism)})")
             if res_B is not None:
                 p1B, p2B, p3B = res_B
-                st.markdown(f"**REV B**: [Primer-BLAST]({primer_blast_url_single(p3B.seq_5to3, org)})")
+                st.markdown(f"**REV B**: [Primer-BLAST]({primer_blast_url_single(p3B.seq_5to3, _organism)})")
 
         if res_A is not None:
-            st.subheader("Dimer check (Reverse A set)")
             p1A, p2A, p3A = res_A
+            _len_a = result.get("len_exon1", 0) + result.get("len_exon_rev_a", 0)
+            if _len_a > 0:
+                st.subheader("Primer positions — Reverse A set")
+                st.caption("FWD A (Exon 1)")
+                render_diagram(_len_a, p1A.start_0based, p1A.length, p3A.start_0based, p3A.length,
+                               max(0, (p3A.start_0based + p3A.length) - p1A.start_0based))
+                st.caption("FWD B (Exon 2)")
+                render_diagram(_len_a, p2A.start_0based, p2A.length, p3A.start_0based, p3A.length,
+                               max(0, (p3A.start_0based + p3A.length) - p2A.start_0based))
+            st.subheader("Dimer check (Reverse A set)")
             print_dimer_report(p1A, p2A, p3A)
-
         if res_B is not None:
-            st.subheader("Dimer check (Reverse B set)")
             p1B, p2B, p3B = res_B
+            _len_b = result.get("len_exon1", 0) + result.get("len_exon_rev_b", 0)
+            if _len_b > 0:
+                st.subheader("Primer positions — Reverse B set")
+                render_diagram(_len_b, p1B.start_0based, p1B.length, p3B.start_0based, p3B.length,
+                               max(0, (p3B.start_0based + p3B.length) - p1B.start_0based))
+            st.subheader("Dimer check (Reverse B set)")
             print_dimer_report(p1B, p2B, p3B)
 
-        add_footer()
+        # ============================
+        # In-app specificity (QBLAST)
+        # ============================
+        st.subheader("In-app Specificity Check (QBLAST)")
+        st.caption("Queries NCBI BLAST directly — takes ~30 s per primer. Results persist until you redesign.")
 
-    except Exception as e:
-        st.error(str(e))
-        add_footer()
+        # Collect all unique primers to BLAST
+        blast_seqs = {}
+        if res_A is not None:
+            p1A, p2A, p3A = res_A
+            blast_seqs["FWD A"] = p1A.seq_5to3
+            blast_seqs["FWD B"] = p2A.seq_5to3
+            blast_seqs["REV A"] = p3A.seq_5to3
+        if res_B is not None:
+            p1B, p2B, p3B = res_B
+            blast_seqs["REV B"] = p3B.seq_5to3
+
+        if st.button("Check Specificity with BLAST", key="splicing_qblast_run"):
+            blast_results = {}
+            for label, pseq in blast_seqs.items():
+                with st.spinner(f"BLASTing {label}…"):
+                    blast_results[label] = run_qblast(pseq, organism=_organism)
+            st.session_state["splicing_blast_results"] = blast_results
+
+        blast_results = st.session_state.get("splicing_blast_results")
+        if blast_results:
+            for label, hits in blast_results.items():
+                st.markdown(f"**{label}** — {specificity_label(hits)}")
+                if hits:
+                    hit_rows = [
+                        {
+                            "Title": h.title,
+                            "Accession": h.accession,
+                            "Identity (%)": h.identity_pct,
+                            "Query Coverage (%)": h.query_coverage_pct,
+                            "E-value": h.evalue,
+                        }
+                        for h in hits
+                    ]
+                    st.dataframe(pd.DataFrame(hit_rows), use_container_width=True)
+                else:
+                    st.info("No hits returned.")
+
+    add_footer()

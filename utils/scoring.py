@@ -1,4 +1,5 @@
-from .seq import tm_wallace, gc_pct, has_bad_runs
+from .seq import gc_pct, has_bad_runs
+from .tm import tm_nn
 
 def primer_score(seq: str, tm_target: float) -> float:
     """
@@ -6,10 +7,10 @@ def primer_score(seq: str, tm_target: float) -> float:
     Simple heuristic: closeness to target Tm,
     penalties for long homopolymers and extreme GC%.
     """
-    tm = tm_wallace(seq)
+    tm = tm_nn(seq)
     score = abs(tm - tm_target)
 
-    if has_bad_runs(seq, max_run=4):
+    if has_bad_runs(seq, max_run_len=4):
         score += 5.0
 
     gcp = gc_pct(seq)

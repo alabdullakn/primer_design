@@ -32,6 +32,7 @@ from designers.regular_pcr import render as render_regular
 from designers.splicing import render as render_splicing
 from designers.home import render as render_home
 from designers.about import render as render_about
+from designers.tutorial import render as render_tutorial
 from ui.footer import add_footer
 
 # ---------------- YOUR EXISTING CSS ----------------
@@ -41,7 +42,7 @@ st.markdown(
     /* Equal-size top navigation tabs */
     div[role="radiogroup"] {
         display: grid !important;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 0.55rem;
         width: 100%;
     }
@@ -81,7 +82,7 @@ st.markdown(
 )
 
 # ---------------- NAVIGATION ----------------
-TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers", "About us"]
+TAB_OPTIONS = ["Home", "Regular PCR", "Splicing primers", "qPCR primers", "How to Use", "About us"]
 
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Home"
@@ -114,6 +115,9 @@ elif st.session_state["active_tab"] == "qPCR primers":
     except Exception as e:
         st.error("qPCR tab crashed during import or rendering.")
         st.exception(e)
+
+elif st.session_state["active_tab"] == "How to Use":
+    render_tutorial()
 
 else:
     render_about()

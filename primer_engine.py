@@ -7,8 +7,13 @@
 # - Streamlit dimer reports
 
 from dataclasses import dataclass
-import math
 from typing import List, Tuple, Optional
+
+from utils.tm import tm_nn, has_hairpin, has_homodimer
+from utils.seq import (
+    clean_seq, revcomp, gc_content, max_run,
+    has_3prime_gc_clamp, has_3prime_complementarity, dimer_risk_percent,
+)
 
 DNA = set("ACGT")
 
@@ -16,19 +21,8 @@ DNA = set("ACGT")
 # ---------------- Data structures ----------------
 
 @dataclass
-class BlastSummary:
-    ok: bool
-    hits_returned: Optional[int] = None
-    top_hit_id: Optional[str] = None
-    top_hit_def: Optional[str] = None
-    top_evalue: Optional[float] = None
-    top_identity_pct: Optional[float] = None
-    note: Optional[str] = None
-
-
-@dataclass
 class PrimerHit:
-    kind: str                      # "FWD" or "REV" (or "PROBE" if you display it)
+    kind: str                      # "FWD" or "REV"
     exon_name: str                 # "Exon1", "Exon2", "Exon3", "Junction", etc
     start_0based: int
     length: int
@@ -37,91 +31,8 @@ class PrimerHit:
     gc_pct: float
     score: float
     template_seq_5to3: Optional[str] = None  # only for REV: binding site on forward strand
-    blast: Optional[BlastSummary] = None
 
 
-
-
-# ---------------- Basic helpers ----------------
-
-def clean_seq(seq: str) -> str:
-    seq = (seq or "").upper()
-    seq = "".join(b for b in seq if b in DNA)
-    if not seq:
-        raise ValueError("No A/C/G/T bases found. Paste a DNA sequence.")
-    return seq
-
-
-def revcomp(seq: str) -> str:
-    comp = {"A": "T", "C": "G", "G": "C", "T": "A"}
-    return "".join(comp[b] for b in reversed(seq))
-
-
-def gc_content(seq: str) -> float:
-    return 100.0 * sum(b in "GC" for b in seq) / len(seq)
-
-
-def tm_wallace(seq: str) -> float:
-    return 2.0 * (seq.count("A") + seq.count("T")) + 4.0 * (seq.count("G") + seq.count("C"))
-
-def tm_with_buffer(
-    seq: str,
-    sodium_mM: float = 50.0,
-    mg_mM: float = 1.5,
-    dntp_mM: float = 0.2,
-) -> float:
-    """
-    Wallace Tm with a basic ionic-strength correction.
-    Na_eq uses a common approximation: [Na+] + 120*sqrt(max([Mg2+] - [dNTP], 0)).
-    """
-    base_tm = tm_wallace(seq)
-
-    free_mg = max(float(mg_mM) - float(dntp_mM), 0.0)
-    na_eq_mM = max(float(sodium_mM), 0.0) + 120.0 * math.sqrt(free_mg)
-    na_eq_mM = max(na_eq_mM, 1.0)
-
-    return base_tm + 16.6 * math.log10(na_eq_mM / 1000.0)
-
-
-def max_run(seq: str) -> int:
-    best = cur = 1
-    for i in range(1, len(seq)):
-        if seq[i] == seq[i - 1]:
-            cur += 1
-            best = max(best, cur)
-        else:
-            cur = 1
-    return best
-
-
-def has_3prime_gc_clamp(seq: str) -> bool:
-    if len(seq) < 2:
-        return False
-    return (seq[-1] in "GC") or (seq[-2] in "GC")
-
-
-def self_complementarity_flag(seq: str) -> bool:
-    rc = revcomp(seq)
-    for i in range(len(seq) - 3):
-        if seq[i:i + 4] in rc:
-            return True
-    return False
-
-
-def has_3prime_complementarity(p1: str, p2: str, k: int = 4) -> bool:
-    if len(p1) < k:
-        return False
-    return revcomp(p1[-k:]) in p2
-
-
-def dimer_risk_percent(p1: str, p2: str, max_k: int = 8) -> float:
-    best = 0
-    for k in range(3, max_k + 1):
-        if has_3prime_complementarity(p1, p2, k=k):
-            best = k
-    if best == 0:
-        return 0.0
-    return min(100.0, (best - 2) / (max_k - 2) * 100.0)
 
 
 # ---------------- Candidate scoring ----------------
@@ -132,16 +43,21 @@ def score_candidate(
     sodium_mM: float = 50.0,
     mg_mM: float = 1.5,
     dntp_mM: float = 0.2,
+    gc_min: float = 35.0,
+    gc_max: float = 65.0,
 ) -> Optional[Tuple[float, float, float]]:
-    tm = tm_with_buffer(seq, sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM)
+    tm = tm_nn(seq, mv_conc=sodium_mM, dv_conc=mg_mM, dntp_conc=dntp_mM)
+    gc = gc_content(seq)
 
     if abs(tm - tm_target) > tm_tol:
         return None
-    if not (35.0 <= gc <= 65.0):
+    if not (gc_min <= gc <= gc_max):
         return None
     if max_run(seq) >= 5:
         return None
-    if self_complementarity_flag(seq):
+    if has_hairpin(seq, mv_conc=sodium_mM, dv_conc=mg_mM, dntp_conc=dntp_mM):
+        return None
+    if has_homodimer(seq, mv_conc=sodium_mM, dv_conc=mg_mM, dntp_conc=dntp_mM):
         return None
 
     score = 0.0
@@ -150,6 +66,7 @@ def score_candidate(
         score += 2.0
     if max_run(seq) == 4:
         score += 2.0
+    score += max(0, 20 - len(seq)) * 0.2  # prefer longer primers
 
     return score, tm, gc
 
@@ -167,6 +84,8 @@ def best_primer_from_exon(
     sodium_mM: float = 50.0,
     mg_mM: float = 1.5,
     dntp_mM: float = 0.2,
+    gc_min: float = 35.0,
+    gc_max: float = 65.0,
 ) -> PrimerHit:
     exon_seq = clean_seq(exon_seq)
     best: Optional[PrimerHit] = None
@@ -183,7 +102,11 @@ def best_primer_from_exon(
                 sodium_mM=sodium_mM,
                 mg_mM=mg_mM,
                 dntp_mM=dntp_mM,
+                gc_min=gc_min,
+                gc_max=gc_max,
             )
+            if scored is None:
+                continue
 
             score, tm, gc = scored
             hit = PrimerHit(
@@ -217,6 +140,8 @@ def best_reverse_avoiding_fwds(
     sodium_mM: float = 50.0,
     mg_mM: float = 1.5,
     dntp_mM: float = 0.2,
+    gc_min: float = 35.0,
+    gc_max: float = 65.0,
 ) -> PrimerHit:
     exon_seq = clean_seq(exon_seq_for_reverse)
     candidates: List[PrimerHit] = []
@@ -233,6 +158,8 @@ def best_reverse_avoiding_fwds(
                 sodium_mM=sodium_mM,
                 mg_mM=mg_mM,
                 dntp_mM=dntp_mM,
+                gc_min=gc_min,
+                gc_max=gc_max,
             )
             if scored is None:
                 continue
@@ -279,43 +206,21 @@ def design_exon_primers(
     sodium_mM: float = 50.0,
     mg_mM: float = 1.5,
     dntp_mM: float = 0.2,
+    gc_min: float = 35.0,
+    gc_max: float = 65.0,
 ) -> Tuple[PrimerHit, PrimerHit, PrimerHit]:
     fwd1 = best_primer_from_exon(
-        exon1,
-        "Exon1",
-        "FWD",
-        min_len,
-        max_len,
-        tm_target,
-        tm_tol,
-        sodium_mM=sodium_mM,
-        mg_mM=mg_mM,
-        dntp_mM=dntp_mM,
+        exon1, "Exon1", "FWD", min_len, max_len, tm_target, tm_tol,
+        sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM, gc_min=gc_min, gc_max=gc_max,
     )
     fwd2 = best_primer_from_exon(
-        exon2,
-        "Exon2",
-        "FWD",
-        min_len,
-        max_len,
-        tm_target,
-        tm_tol,
-        sodium_mM=sodium_mM,
-        mg_mM=mg_mM,
-        dntp_mM=dntp_mM,
+        exon2, "Exon2", "FWD", min_len, max_len, tm_target, tm_tol,
+        sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM, gc_min=gc_min, gc_max=gc_max,
     )
     rev3 = best_reverse_avoiding_fwds(
-        exon3_for_reverse,
-        fwd1,
-        fwd2,
-        min_len,
-        max_len,
-        tm_target,
-        tm_tol,
-        dimer_k=dimer_k,
-        sodium_mM=sodium_mM,
-        mg_mM=mg_mM,
-        dntp_mM=dntp_mM,
+        exon3_for_reverse, fwd1, fwd2, min_len, max_len, tm_target, tm_tol,
+        dimer_k=dimer_k, sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM,
+        gc_min=gc_min, gc_max=gc_max,
     )
     return fwd1, fwd2, rev3
 
@@ -354,10 +259,13 @@ def design_basic_pcr_primers(
     sodium_mM: float = 50.0,
     mg_mM: float = 1.5,
     dntp_mM: float = 0.2,
-) -> Tuple[str, str, int, int, int]:
+    gc_min: float = 35.0,
+    gc_max: float = 65.0,
+    top_n: int = 5,
+) -> List[Tuple[str, str, int, int, int]]:
     """
-    Returns:
-      (fwd_primer_5to3, rev_primer_5to3, amplicon_len, fwd_start, rev_bind_start)
+    Returns up to top_n (fwd, rev, amplicon_len, fwd_start, rev_bind_start) tuples,
+    sorted best-first by combined score.
     """
 
     seq = clean_seq(template_seq)
@@ -376,29 +284,23 @@ def design_basic_pcr_primers(
     if amplicon_min > amplicon_max:
         raise RuntimeError("Amplicon min cannot be greater than amplicon max.")
 
-    best_pair = None
+    all_pairs = []  # (total_score, fwd, rev, amp_len, fwd_start, rev_bind_start)
 
     for Lf in range(min_len, max_len + 1):
         for i in range(0, fwd_region_end - Lf + 1):
             fwd = seq[i:i + Lf]
             f_scored = score_candidate(
-                fwd,
-                tm_target,
-                tm_tol,
-                sodium_mM=sodium_mM,
-                mg_mM=mg_mM,
-                dntp_mM=dntp_mM,
+                fwd, tm_target, tm_tol,
+                sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM,
+                gc_min=gc_min, gc_max=gc_max,
             )
             if f_scored is None:
                 continue
             f_score, _, _ = f_scored
             fwd_3 = i + Lf
 
-            search_j_min = fwd_3 + amplicon_min - 1
-            search_j_max = fwd_3 + amplicon_max
-
-            j_start = max(rev_region_start, search_j_min)
-            j_end = min(n, search_j_max)
+            j_start = max(rev_region_start, fwd_3 + amplicon_min - 1)
+            j_end = min(n, fwd_3 + amplicon_max)
 
             if j_start >= j_end:
                 continue
@@ -410,12 +312,9 @@ def design_basic_pcr_primers(
                     rev = revcomp(bind_site)
 
                     r_scored = score_candidate(
-                        rev,
-                        tm_target,
-                        tm_tol,
-                        sodium_mM=sodium_mM,
-                        mg_mM=mg_mM,
-                        dntp_mM=dntp_mM,
+                        rev, tm_target, tm_tol,
+                        sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM,
+                        gc_min=gc_min, gc_max=gc_max,
                     )
                     if r_scored is None:
                         continue
@@ -435,19 +334,19 @@ def design_basic_pcr_primers(
                 continue
 
             r_score, rev, amp_len, j = best_rev_for_this_fwd
-            total = f_score + r_score
+            all_pairs.append((f_score + r_score, fwd, rev, amp_len, i, j))
 
-            if best_pair is None or total < best_pair[0]:
-                best_pair = (total, fwd, rev, amp_len, i, j)
-
-    if best_pair is None:
+    if not all_pairs:
         raise RuntimeError(
             "No primer pair found with your constraints. "
             "Try increasing Tm tolerance, widening length range, or widening amplicon range."
         )
 
-    _, fwd, rev, amp_len, fwd_start, rev_bind_start = best_pair
-    return fwd, rev, amp_len, fwd_start, rev_bind_start
+    all_pairs.sort(key=lambda x: x[0])
+    return [
+        (fwd, rev, amp_len, fwd_start, rev_bind_start)
+        for _, fwd, rev, amp_len, fwd_start, rev_bind_start in all_pairs[:top_n]
+    ]
 
 
 def print_dimer_report_pair(fwd_seq: str, rev_seq: str) -> None:
