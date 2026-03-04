@@ -42,14 +42,11 @@ def _fetch_ncbi_fasta(accession: str) -> str:
 
 def render():
     st.title("Regular PCR")
-    col_title, col_btn = st.columns([5, 1])
-    with col_title:
-        st.write("Design a standard forward and reverse primer pair from a single template sequence.")
-    with col_btn:
-        if st.button("How to use", key="reg_help_btn"):
-            st.session_state["tutorial_topic"] = "regular_pcr"
-            st.session_state["requested_tab"] = "How to Use"
-            st.rerun()
+    st.write("Design a standard forward and reverse primer pair from a single template sequence.")
+    if st.button("How to use", key="reg_help_btn"):
+        st.session_state["tutorial_topic"] = "regular_pcr"
+        st.session_state["requested_tab"] = "How to Use"
+        st.rerun()
 
     # persistent template storage across reruns
     if "reg_template_seq" not in st.session_state:

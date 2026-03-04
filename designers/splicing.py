@@ -16,16 +16,12 @@ SPLICING_IMG = ASSETS_DIR / "splicing_examples.png"
 
 
 def render():
-    col_title, col_btn = st.columns([5, 1])
-    with col_title:
-        st.title("Splicing primers")
-        st.write("Design primers for exon skipping, intron retention, or alternative splicing.")
-    with col_btn:
-        st.write("")  # vertical alignment spacer
-        if st.button("How to use", key="splicing_help_btn"):
-            st.session_state["tutorial_topic"] = "splicing"
-            st.session_state["requested_tab"] = "How to Use"
-            st.rerun()
+    st.title("Splicing primers")
+    st.write("Design primers for exon skipping, intron retention, or alternative splicing.")
+    if st.button("How to use", key="splicing_help_btn"):
+        st.session_state["tutorial_topic"] = "splicing"
+        st.session_state["requested_tab"] = "How to Use"
+        st.rerun()
 
     st.subheader("Examples")
     if SPLICING_IMG.exists():

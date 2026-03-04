@@ -14,15 +14,11 @@ from ui.footer import add_footer
 from ui.blocks import render_diagram, download_primers_csv
 
 def render():
-    col_title, col_btn = st.columns([5, 1])
-    with col_title:
-        st.title("qPCR primers")
-    with col_btn:
-        st.write("")  # vertical alignment spacer
-        if st.button("How to use", key="qpcr_help_btn"):
-            st.session_state["tutorial_topic"] = "qpcr"
-            st.session_state["requested_tab"] = "How to Use"
-            st.rerun()
+    st.title("qPCR primers")
+    if st.button("How to use", key="qpcr_help_btn"):
+        st.session_state["tutorial_topic"] = "qpcr"
+        st.session_state["requested_tab"] = "How to Use"
+        st.rerun()
     
     # ============================
     # Strategy selector
