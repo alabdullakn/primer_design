@@ -7,7 +7,6 @@ from primer_engine import design_exon_primers, print_dimer_report
 from utils.blast import primer_blast_url_pair, primer_blast_url_single
 from utils.qblast import run_qblast, specificity_label
 from utils.seq import count_stripped
-from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 
 from ui.blocks import render_diagram, download_primers_csv
 
@@ -261,7 +260,6 @@ def render():
         _organism = result["organism"]
 
         st.success("Primers designed successfully.")
-        st.caption(SCORE_EXPLANATION)
 
         out_rows = []
         blast_links = []
@@ -298,21 +296,6 @@ def render():
             st.dataframe(pd.DataFrame(out_rows), use_container_width=True)
             download_primers_csv(out_rows, filename="splicing_primers.csv")
 
-        st.subheader("Primer-BLAST links (NCBI)")
-        for name, url in blast_links:
-            st.markdown(f"**{name}**: [Open in Primer-BLAST]({url})")
-        st.info(BLAST_INSTRUCTIONS)
-
-        with st.expander("Single-primer Primer-BLAST links"):
-            if res_A is not None:
-                p1A, p2A, p3A = res_A
-                st.markdown(f"**FWD A**: [Primer-BLAST]({primer_blast_url_single(p1A.seq_5to3, _organism)})")
-                st.markdown(f"**FWD B**: [Primer-BLAST]({primer_blast_url_single(p2A.seq_5to3, _organism)})")
-                st.markdown(f"**REV A**: [Primer-BLAST]({primer_blast_url_single(p3A.seq_5to3, _organism)})")
-            if res_B is not None:
-                p1B, p2B, p3B = res_B
-                st.markdown(f"**REV B**: [Primer-BLAST]({primer_blast_url_single(p3B.seq_5to3, _organism)})")
-
         if res_A is not None:
             p1A, p2A, p3A = res_A
             _len_a = result.get("len_exon1", 0) + result.get("len_exon_rev_a", 0)
@@ -339,10 +322,8 @@ def render():
         # ============================
         # In-app specificity (QBLAST)
         # ============================
-        st.subheader("In-app Specificity Check (QBLAST)")
-        st.caption("Queries NCBI BLAST directly — takes ~30 s per primer. Results persist until you redesign.")
+        st.subheader("Specificity Check (QBLAST)")
 
-        # Collect all unique primers to BLAST
         blast_seqs = {}
         if res_A is not None:
             p1A, p2A, p3A = res_A
@@ -381,3 +362,7 @@ def render():
                     st.dataframe(pd.DataFrame(hit_rows), use_container_width=True)
                 else:
                     st.info("No hits returned.")
+
+        st.subheader("Primer-BLAST (NCBI)")
+        for name, url in blast_links:
+            st.markdown(f"**{name}**: [Open in Primer-BLAST ↗]({url})")

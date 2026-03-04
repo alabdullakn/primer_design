@@ -7,7 +7,6 @@ from qpcr_engine import (
     design_qpcr_junction_pair,
     design_intron_flanking_pair,
 )
-from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from utils.blast import primer_blast_url_pair, primer_blast_url_single
 from utils.qblast import run_qblast, specificity_label
 
@@ -280,7 +279,6 @@ def render():
 
         st.success(f"Found {len(pairs)} primer pair(s) — showing top {len(pairs)}.")
         st.write(f"Chemistry: {_chemistry_label}")
-        st.caption(SCORE_EXPLANATION)
 
         # Pair selector
         if len(pairs) > 1:
@@ -350,23 +348,10 @@ def render():
                 junction_pos=_junction_pos,
             )
 
-        st.subheader("Primer-BLAST links (NCBI)")
-        pair_url = primer_blast_url_pair(fwd.seq_5to3, rev.seq_5to3, _organism)
-        st.markdown(f"**qPCR pair**: [Open in Primer-BLAST]({pair_url})")
-
-        with st.expander("Single-primer Primer-BLAST links"):
-            st.markdown(f"**Forward primer**: [Primer-BLAST]({primer_blast_url_single(fwd.seq_5to3, _organism)})")
-            st.markdown(f"**Reverse primer**: [Primer-BLAST]({primer_blast_url_single(rev.seq_5to3, _organism)})")
-            if probe is not None:
-                st.markdown(f"**Probe**: [Primer-BLAST]({primer_blast_url_single(probe.seq_5to3, _organism)})")
-
-        st.info(BLAST_INSTRUCTIONS)
-
         # ============================
         # In-app specificity (QBLAST)
         # ============================
-        st.subheader("In-app Specificity Check (QBLAST)")
-        st.caption("Queries NCBI BLAST directly — takes ~30 s per primer. Results persist until you redesign.")
+        st.subheader("Specificity Check (QBLAST)")
 
         blast_seqs = {"FWD": fwd.seq_5to3, "REV": rev.seq_5to3}
         if probe is not None:
@@ -400,3 +385,7 @@ def render():
                     st.dataframe(pd.DataFrame(hit_rows), use_container_width=True)
                 else:
                     st.info("No hits returned.")
+
+        st.subheader("Primer-BLAST (NCBI)")
+        pair_url = primer_blast_url_pair(fwd.seq_5to3, rev.seq_5to3, _organism)
+        st.markdown(f"[Open in Primer-BLAST ↗]({pair_url})")

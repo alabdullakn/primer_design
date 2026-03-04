@@ -7,7 +7,6 @@ from utils.blast import primer_blast_url_pair
 from utils.seq import gc_pct, primer_score, count_stripped
 from utils.tm import tm_nn
 from utils.qblast import run_qblast, specificity_label
-from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from ui.blocks import render_diagram, download_primers_csv
 
 
@@ -261,7 +260,6 @@ def render():
         _organism = result["organism"]
 
         st.success(f"Found {len(pairs)} primer pair(s) — showing top {len(pairs)}.")
-        st.caption(SCORE_EXPLANATION)
 
         # Pair selector
         if len(pairs) > 1:
@@ -300,19 +298,13 @@ def render():
         st.subheader("Primer positions")
         render_diagram(template_len, fwd_start, len(fwd), rev_bind_start, len(rev), amp_len)
 
-        st.subheader("Primer-BLAST link (NCBI)")
-        url = primer_blast_url_pair(fwd, rev, _organism)
-        st.markdown(f"[Open in Primer-BLAST]({url})")
-        st.info(BLAST_INSTRUCTIONS)
-
         st.subheader("Dimer check")
         print_dimer_report_pair(fwd, rev)
 
         # ============================
         # In-app specificity (QBLAST)
         # ============================
-        st.subheader("In-app Specificity Check (QBLAST)")
-        st.caption("Queries NCBI BLAST directly — takes ~30 s per primer. Results persist until you redesign.")
+        st.subheader("Specificity Check (QBLAST)")
         if st.button("Check Specificity with BLAST", key="reg_qblast_run"):
             blast_results = {}
             try:
@@ -342,3 +334,7 @@ def render():
                     st.dataframe(pd.DataFrame(hit_rows), use_container_width=True)
                 else:
                     st.info("No hits returned.")
+
+        st.subheader("Primer-BLAST (NCBI)")
+        url = primer_blast_url_pair(fwd, rev, _organism)
+        st.markdown(f"[Open in Primer-BLAST ↗]({url})")
