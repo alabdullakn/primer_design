@@ -2,6 +2,7 @@ import base64
 from pathlib import Path
 
 import streamlit as st
+from ui.footer import add_footer
 
 
 def _background_style() -> str:
@@ -145,3 +146,5 @@ def render():
     if go_qpcr:
         st.session_state["requested_tab"] = "qPCR primers"
         st.rerun()
+
+    add_footer()

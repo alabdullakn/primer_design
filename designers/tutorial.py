@@ -1,6 +1,6 @@
 # designers/tutorial.py
 import streamlit as st
-from ui.footer import add_footer
+
 
 
 _TOPICS = {
@@ -26,15 +26,18 @@ def render():
     # Style subtab buttons to match main nav tabs
     st.markdown("""
     <style>
-    button[data-testid="baseButton-secondary"] {
+    /* Tutorial subtab inactive */
+    button[kind="secondary"], button[data-testid="baseButton-secondary"] {
         background: rgba(15, 23, 42, 0.82) !important;
         border: 1px solid rgba(148, 163, 184, 0.35) !important;
         border-radius: 10px !important;
         color: #e2e8f0 !important;
         font-weight: 700 !important;
         font-size: 1.02rem !important;
+        width: 100% !important;
     }
-    button[data-testid="baseButton-primary"] {
+    /* Tutorial subtab active */
+    button[kind="primary"], button[data-testid="baseButton-primary"] {
         background: linear-gradient(180deg, rgba(37, 99, 235, 0.96), rgba(30, 64, 175, 0.96)) !important;
         border: 1px solid #7dd3fc !important;
         border-radius: 10px !important;
@@ -42,6 +45,7 @@ def render():
         font-weight: 700 !important;
         font-size: 1.02rem !important;
         box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35) !important;
+        width: 100% !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -62,8 +66,6 @@ def render():
         _tutorial_qpcr()
     elif topic == "splicing":
         _tutorial_splicing()
-
-    add_footer()
 
 
 # ─────────────────────────────────────────────

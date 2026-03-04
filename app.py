@@ -33,7 +33,6 @@ from designers.splicing import render as render_splicing
 from designers.home import render as render_home
 from designers.about import render as render_about
 from designers.tutorial import render as render_tutorial
-from ui.footer import add_footer
 
 # ---------------- YOUR EXISTING CSS ----------------
 st.markdown(
@@ -121,6 +120,3 @@ elif st.session_state["active_tab"] == "How to Use":
 
 else:
     render_about()
-
-# ---------------- FOOTER ----------------
-add_footer()

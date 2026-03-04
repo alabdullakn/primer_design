@@ -8,7 +8,7 @@ from utils.blast import primer_blast_url_pair, primer_blast_url_single
 from utils.qblast import run_qblast, specificity_label
 from utils.seq import count_stripped
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
-from ui.footer import add_footer
+
 from ui.blocks import render_diagram, download_primers_csv
 
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
@@ -204,7 +204,6 @@ def render():
 
     if int(max_len) < int(min_len):
         st.error("Max primer length must be ≥ min primer length.")
-        add_footer()
         return
 
     run = st.button("Design primers", key="splicing_design_btn")
@@ -379,5 +378,3 @@ def render():
                     st.dataframe(pd.DataFrame(hit_rows), use_container_width=True)
                 else:
                     st.info("No hits returned.")
-
-    add_footer()

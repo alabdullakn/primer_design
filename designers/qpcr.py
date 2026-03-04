@@ -10,7 +10,7 @@ from qpcr_engine import (
 from ui.text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 from utils.blast import primer_blast_url_pair, primer_blast_url_single
 from utils.qblast import run_qblast, specificity_label
-from ui.footer import add_footer
+
 from ui.blocks import render_diagram, download_primers_csv
 
 def render():
@@ -397,5 +397,3 @@ def render():
                     st.dataframe(pd.DataFrame(hit_rows), use_container_width=True)
                 else:
                     st.info("No hits returned.")
-
-    add_footer()
