@@ -8,6 +8,7 @@ from utils.seq import gc_pct, primer_score, count_stripped
 from utils.tm import tm_nn
 from utils.qblast import run_qblast, specificity_label
 from ui.blocks import render_diagram, download_primers_csv
+from utils.examples import EXAMPLE_REG_PCR
 
 
 def _parse_fasta_text(text: str) -> str:
@@ -145,6 +146,12 @@ def render():
     # ============================
 
     st.subheader("Sequence input")
+
+    if st.button("Load example (human GAPDH)", key="reg_load_example"):
+        st.session_state["reg_input_mode"] = "Paste sequence"
+        st.session_state["reg_seq_paste"] = EXAMPLE_REG_PCR
+        st.session_state["reg_template_seq"] = EXAMPLE_REG_PCR.replace("\n", "")
+        st.rerun()
 
     mode = st.radio(
         "Choose input type",

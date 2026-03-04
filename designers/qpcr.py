@@ -11,6 +11,7 @@ from utils.blast import primer_blast_url_pair, primer_blast_url_single
 from utils.qblast import run_qblast, specificity_label
 
 from ui.blocks import render_diagram, download_primers_csv
+from utils.examples import EXAMPLE_QPCR_JUNCTION, EXAMPLE_QPCR_EXON_A, EXAMPLE_QPCR_EXON_B
 
 def render():
     st.title("qPCR primers")
@@ -139,6 +140,16 @@ def render():
     # ============================
     # Sequence input (mode-specific)
     # ============================
+    if is_junction:
+        if st.button("Load example (human GAPDH junction)", key="qpcr_load_example"):
+            st.session_state["qpcr_seq_junction"] = EXAMPLE_QPCR_JUNCTION
+            st.rerun()
+    else:
+        if st.button("Load example (human ACTB intron-flanking)", key="qpcr_load_example"):
+            st.session_state["qpcr_exon_a"] = EXAMPLE_QPCR_EXON_A
+            st.session_state["qpcr_exon_b"] = EXAMPLE_QPCR_EXON_B
+            st.rerun()
+
     if is_junction:
         st.write("Mark the exon-exon junction with `^` in your cDNA/mRNA sequence.")
         st.caption("Example: `...AAGCTAGTCCAG^GTTAGCCTAAGG...`  — provide ≥10 bases on each side.")
