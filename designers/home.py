@@ -117,8 +117,9 @@ def render():
     st.markdown('<div class="hero-title">PrimerQ</div>', unsafe_allow_html=True)
     st.markdown(
         (
-            '<div class="hero-sub">Welcome to PrimerQ, the easiest website to design your primers. '
-            'To continue pick one of the options below:</div>'
+            '<div class="hero-sub">Welcome to PrimerQ — design PCR, qPCR, and splicing primers in seconds. '
+            'Run in-app NCBI QBLAST specificity checks, get TaqMan probes, and export results as CSV. '
+            'To continue, pick one of the options below:</div>'
         ),
         unsafe_allow_html=True,
     )
