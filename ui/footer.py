@@ -13,7 +13,7 @@ def add_footer():
             bottom: 0;
             z-index: 9999;
             padding: 0.75rem 1rem;
-            border-top: 1px solid rgba(148, 163, 184, 0.25);
+
             background: linear-gradient(180deg, rgba(2, 6, 23, 0.9), rgba(2, 6, 23, 0.98));
             color: rgba(226, 232, 240, 0.92);
             font-size: 0.96rem;
