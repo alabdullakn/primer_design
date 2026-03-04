@@ -266,6 +266,9 @@ def design_basic_pcr_primers(
     """
     Returns up to top_n (fwd, rev, amplicon_len, fwd_start, rev_bind_start) tuples,
     sorted best-first by combined score.
+
+    Pre-scores all forward and reverse candidates independently (O(n) tm_nn calls),
+    then pairs them with cheap range + dimer checks — avoids O(n²) thermodynamic calls.
     """
 
     seq = clean_seq(template_seq)
@@ -284,62 +287,72 @@ def design_basic_pcr_primers(
     if amplicon_min > amplicon_max:
         raise RuntimeError("Amplicon min cannot be greater than amplicon max.")
 
-    all_pairs = []  # (total_score, fwd, rev, amp_len, fwd_start, rev_bind_start)
-
+    # ── Step 1: score every forward candidate once ──────────────────────────
+    # Each entry: (score, seq, fwd_start, fwd_3end)
+    fwd_candidates: List[Tuple[float, str, int, int]] = []
     for Lf in range(min_len, max_len + 1):
         for i in range(0, fwd_region_end - Lf + 1):
             fwd = seq[i:i + Lf]
-            f_scored = score_candidate(
+            scored = score_candidate(
                 fwd, tm_target, tm_tol,
                 sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM,
                 gc_min=gc_min, gc_max=gc_max,
             )
-            if f_scored is None:
+            if scored is None:
                 continue
-            f_score, _, _ = f_scored
-            fwd_3 = i + Lf
+            fwd_candidates.append((scored[0], fwd, i, i + Lf))
 
-            j_start = max(rev_region_start, fwd_3 + amplicon_min - 1)
-            j_end = min(n, fwd_3 + amplicon_max)
-
-            if j_start >= j_end:
+    # ── Step 2: score every reverse candidate once ───────────────────────────
+    # Each entry: (score, rev_seq, bind_start, bind_end)
+    rev_candidates: List[Tuple[float, str, int, int]] = []
+    for Lr in range(min_len, max_len + 1):
+        for j in range(rev_region_start, n - Lr + 1):
+            bind_site = seq[j:j + Lr]
+            rev = revcomp(bind_site)
+            scored = score_candidate(
+                rev, tm_target, tm_tol,
+                sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM,
+                gc_min=gc_min, gc_max=gc_max,
+            )
+            if scored is None:
                 continue
+            rev_candidates.append((scored[0], rev, j, j + Lr))
 
-            best_rev_for_this_fwd = None
-            for Lr in range(min_len, max_len + 1):
-                for j in range(j_start, j_end - Lr + 1):
-                    bind_site = seq[j:j + Lr]
-                    rev = revcomp(bind_site)
+    if not fwd_candidates:
+        raise RuntimeError(
+            "No forward primer found with your constraints. "
+            "Try increasing Tm tolerance, widening length range, or adjusting GC range."
+        )
+    if not rev_candidates:
+        raise RuntimeError(
+            "No reverse primer found with your constraints. "
+            "Try increasing Tm tolerance, widening length range, or adjusting GC range."
+        )
 
-                    r_scored = score_candidate(
-                        rev, tm_target, tm_tol,
-                        sodium_mM=sodium_mM, mg_mM=mg_mM, dntp_mM=dntp_mM,
-                        gc_min=gc_min, gc_max=gc_max,
-                    )
-                    if r_scored is None:
-                        continue
-                    r_score, _, _ = r_scored
-
-                    if has_3prime_complementarity(fwd, rev, k=dimer_k):
-                        continue
-
-                    amp_len = (j + Lr) - i
-                    if amp_len < amplicon_min or amp_len > amplicon_max:
-                        continue
-
-                    if best_rev_for_this_fwd is None or r_score < best_rev_for_this_fwd[0]:
-                        best_rev_for_this_fwd = (r_score, rev, amp_len, j)
-
-            if best_rev_for_this_fwd is None:
+    # ── Step 3: pair candidates — cheap range + dimer check only ─────────────
+    all_pairs = []
+    for f_score, fwd, fwd_start, fwd_3 in fwd_candidates:
+        best_rev_for_this_fwd = None
+        for r_score, rev, j, j_end in rev_candidates:
+            amp_len = j_end - fwd_start
+            if amp_len < amplicon_min or amp_len > amplicon_max:
                 continue
+            if j < fwd_3:
+                continue
+            if has_3prime_complementarity(fwd, rev, k=dimer_k):
+                continue
+            if best_rev_for_this_fwd is None or r_score < best_rev_for_this_fwd[0]:
+                best_rev_for_this_fwd = (r_score, rev, amp_len, j)
 
-            r_score, rev, amp_len, j = best_rev_for_this_fwd
-            all_pairs.append((f_score + r_score, fwd, rev, amp_len, i, j))
+        if best_rev_for_this_fwd is None:
+            continue
+        r_score, rev, amp_len, j = best_rev_for_this_fwd
+        all_pairs.append((f_score + r_score, fwd, rev, amp_len, fwd_start, j))
 
     if not all_pairs:
         raise RuntimeError(
             "No primer pair found with your constraints. "
-            "Try increasing Tm tolerance, widening length range, or widening amplicon range."
+            "Try increasing Tm tolerance, widening amplicon range, or widening the search windows."
         )
 
     all_pairs.sort(key=lambda x: x[0])
