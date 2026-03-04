@@ -105,6 +105,13 @@ def render():
                 key="splicing_dntp_mM",
                 disabled=not edit_reaction_buffer,
             )
+    # Apply pending example load BEFORE widgets render
+    if st.session_state.pop("_splicing_example_pending", False):
+        st.session_state["splicing_condition"] = "Condition 1: FWD A + FWD B + REV A"
+        st.session_state["splicing_fwd_a"] = EXAMPLE_SPLICING_FWD_A
+        st.session_state["splicing_fwd_b"] = EXAMPLE_SPLICING_FWD_B
+        st.session_state["splicing_rev_a"] = EXAMPLE_SPLICING_REV_A
+
     st.subheader("Choose which condition to generate")
     st.caption("Look at the image above for reference.")
     
@@ -159,10 +166,7 @@ def render():
         selected_pairs = ["FWD A + REV A", "FWD A + REV B"]
 
     if st.button("Load example (human CD44 splicing)", key="splicing_load_example"):
-        st.session_state["splicing_condition"] = "Condition 1: FWD A + FWD B + REV A"
-        st.session_state["splicing_fwd_a"] = EXAMPLE_SPLICING_FWD_A
-        st.session_state["splicing_fwd_b"] = EXAMPLE_SPLICING_FWD_B
-        st.session_state["splicing_rev_a"] = EXAMPLE_SPLICING_REV_A
+        st.session_state["_splicing_example_pending"] = True
         st.rerun()
 
     needs_fwd_a = any(p.startswith("FWD A") for p in selected_pairs)
