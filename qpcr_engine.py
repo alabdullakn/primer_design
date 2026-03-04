@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from utils.tm import tm_nn, has_hairpin, has_homodimer
 from utils.seq import clean_seq, revcomp, gc_content, max_run, has_3prime_complementarity
