@@ -88,7 +88,7 @@ def render():
         with r2:
             max_len = st.number_input("Max length", 16, 32, 24, key="qpcr_max_len")
             tm_tol = st.number_input("Tm tolerance (± °C)", 0.5, 10.0, 2.0, key="qpcr_tm_tol")
-            gc_max = st.number_input("GC max percent", 20.0, 80.0, 60.0, key="qpcr_gc_max")
+            gc_max = st.number_input("GC max percent", 20.0, 80.0, 65.0, key="qpcr_gc_max")
             amp_max = st.number_input("Amplicon max bp", 60, 500, 200, key="qpcr_amp_max")
             if is_junction:
                 junction_3p_max_distance = st.number_input(

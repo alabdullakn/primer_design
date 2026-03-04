@@ -1,2 +1,1 @@
-from .text import BLAST_INSTRUCTIONS, SCORE_EXPLANATION
 
